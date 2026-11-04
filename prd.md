@@ -919,3 +919,115 @@ This project is proprietary software owned by Innovation Hub Abia.
 **Document Version:** 1.0.0  
 **Last Updated:** January 8, 2026  
 **Status:** Active Development
+
+4. Design System & Frontend Guidelines
+
+Visual Style ("Minimalist Duolingo")
+
+
+
+
+
+Hard Constraints:
+
+
+
+
+
+Zero borders (border: none !important): Clean planar separation only.
+
+
+
+Zero drop shadows (box-shadow: none !important): Completely flat modern aesthetic.
+
+
+
+Zero 3D button ledges: Modernized pill buttons without faux-3D skeuomorphic bevels.
+
+
+
+Zero dividing hair lines (<hr>, border lines): Visual grouping achieved entirely through padding rhythm (p-6 to p-8) and background color contrast.
+
+Palette Tokens
+
+
+
+
+
+Canvas: Pure White (#FFFFFF)
+
+
+
+Surface / Cards / Inactive Controls: Warm Gray (#F7F7F7 / #F3F3F3)
+
+
+
+Primary Accent / CTA: Duolingo Green (#58CC02)
+
+
+
+Active Tint / Selection Pills: Soft Mint (#D7FFB8)
+
+
+
+Typography Primary: Deep Charcoal (#1F2937)
+
+
+
+Typography Secondary / Muted: Neutral Gray (#6B7280)
+
+Typography & Component Shapes
+
+
+
+
+
+Font Family: Plus Jakarta Sans / Nunito (Clean, geometric, friendly sans-serif).
+
+
+
+Border Radii:
+
+
+
+
+
+Buttons & Badges: rounded-full (9999px)
+
+
+
+Cards & Containers: rounded-3xl (24px - 32px)
+
+
+
+Checkboxes & Micro-tags: rounded-xl (12px)
+
+
+
+5. Technical Requirements & Stack
+
+
+
+
+
+Frontend Framework: React 18+ (SPA / Next.js compatible)
+
+
+
+Styling Engine: Tailwind CSS 3.4+
+
+
+
+Iconography: Lucide React (stroke width 2px)
+
+
+
+State Management: Zustand or React Context for local mock persistence (tasks, streak, learning logs).
+
+
+
+Export Engine: Client-side markdown zip generation + GitHub GraphQL API integration for syncing commits/PR notes.
+
+
+
+Device Support: Responsive mobile-first app layout (~390px viewport baseline) scaling smoothly to wide tablet/desktop viewports.

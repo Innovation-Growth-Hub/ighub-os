@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * IGHUB OS design tokens — "Minimalist Duolingo" (PRD §4).
+ * Hard constraints: no borders, no drop shadows, no hairline dividers.
+ * Grouping comes from padding rhythm and background contrast only.
+ */
+@theme {
+  --color-canvas: #ffffff;
+  --color-surface: #f7f7f7;
+  --color-surface-2: #f3f3f3;
+  --color-surface-3: #e9e9e9;
+
+  --color-primary: #58cc02;
+  --color-primary-hover: #4fb802;
+  /* Text-safe green on white (≈5.4:1). Use for green *text*, never #58CC02. */
+  --color-primary-ink: #2f7a00;
+  /* Text on a #58CC02 fill. White only reaches ≈2.1:1, so charcoal is used. */
+  --color-on-primary: #1f2937;
+  --color-mint: #d7ffb8;
+  --color-mint-soft: #effee3;
+
+  --color-ink: #1f2937;
+  --color-muted: #6b7280;
+
+  /* Sequential green ramp (light → dark) for magnitude encodings (heatmaps). */
+  --color-seq-1: #effee3;
+  --color-seq-2: #d7ffb8;
+  --color-seq-3: #a8ec6e;
+  --color-seq-4: #58cc02;
+  --color-seq-5: #2f7a00;
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-4xl: 2rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-style: none !important;
+    box-shadow: none !important;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  hr {
+    display: none;
+  }
+
+  html {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Focus uses outline (not box-shadow) so it survives the no-shadow rule. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-mint);
+  }
+
+  dialog::backdrop {
+    background: rgb(31 41 55 / 0.4);
+  }
 }

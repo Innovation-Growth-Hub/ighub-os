@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# IGHUB OS
 
-## Getting Started
+Operations platform for Innovation Growth Hub Abia: staff, QR attendance, tasks, projects, CRM, learning, finance, documents, meetings and social media.
 
-First, run the development server:
+**Current stage:** frontend only, on mock data (no backend yet). See [docs/ROADMAP.md](docs/ROADMAP.md) for the timeline and [prd.md](prd.md) for requirements.
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Log in with any demo account (password `password`) or pick a role on the login screen:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Role | Email |
+|---|---|
+| Super Admin | superadmin@ighub.com |
+| Admin | admin@ighub.com |
+| Staff | staff@ighub.com |
+| Project Manager | pm@ighub.com |
+| Trainer | trainer@ighub.com |
+| Student | student@ighub.com |
+| Social Media Manager | social@ighub.com |
+| Client | client@partner.com |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Data lives in your browser's localStorage. Admins can restore it under **Settings → Account → Reset demo data**.
 
-## Learn More
+## Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  proxy.ts                 optimistic auth redirect (cookie check)
+  app/(auth)/              login, register
+  app/(app)/               authenticated routes (one folder per module)
+  components/ui/           design-system primitives (Button, Card, Badge, Modal, Table…)
+  components/charts/       ColumnChart, BarList, Heatmap
+  components/layout/       AppShell, Sidebar, Topbar, nav config
+  lib/types.ts             domain types (the future API contract)
+  lib/mock/seed.ts         deterministic seed data
+  lib/store.ts             Zustand store: collections + actions (becomes API calls)
+  lib/auth/auth-client.ts  mock auth shaped like Better Auth's client
+  lib/auth/roles.ts        roles + route access table
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Swapping in the backend
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Auth:** replace the body of `lib/auth/auth-client.ts` with `createAuthClient()` from `better-auth/react`, and in `proxy.ts` use `getSessionCookie()`.
+- **Data:** replace `useDb` actions with API calls (TanStack Query), keeping the same shapes from `lib/types.ts`.
+- **Access:** enforce `ROUTE_ACCESS` and the row rules in `lib/access.ts` on the server.
 
-## Deploy on Vercel
+## Design rules
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Flat "Minimalist Duolingo" style: no borders, no shadows, no dividers. Group things with padding and background contrast. Primary `#58CC02` (green *text* uses `#2F7A00` for contrast), mint `#D7FFB8`, surfaces `#F7F7F7`/`#F3F3F3`, pill buttons, `rounded-3xl` cards. Tokens are in `src/app/globals.css`.
