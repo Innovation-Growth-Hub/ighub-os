@@ -11,13 +11,13 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/form";
 import { Avatar, PageHeader, Pills } from "@/components/ui/misc";
 import { Badge } from "@/components/ui/badge";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { BrandLoader } from "@/components/ui/brand-loader";
 
 type Tab = "profile" | "account";
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<LogoLoader />}>
+    <Suspense fallback={<BrandLoader />}>
       <Settings />
     </Suspense>
   );

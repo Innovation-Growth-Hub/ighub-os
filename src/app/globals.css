@@ -20,6 +20,15 @@
   --color-mint: #d7ffb8;
   --color-mint-soft: #effee3;
 
+  /* IGHub brand palette (from the logo). Use for illustration and accents;
+     UI actions stay on --color-primary. */
+  --color-brand-navy: #2a2b6f;
+  --color-brand-green: #89be2c;
+  --color-brand-orange: #fb571d;
+  --color-brand-sky: #29abe2;
+  --color-sky-soft: #e6f6fd;
+  --color-orange-soft: #fff0ea;
+
   --color-ink: #1f2937;
   --color-muted: #6b7280;
 
@@ -70,4 +79,9 @@
   dialog::backdrop {
     background: rgb(31 41 55 / 0.4);
   }
+}
+
+@keyframes brand-bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-12px); }
 }

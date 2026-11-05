@@ -55,7 +55,7 @@ export function Topbar({ user, onMenu }: { user: User; onMenu: () => void }) {
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg font-extrabold tracking-tight">
-          {greeting(now.getHours())}, {user.name.split(" ")[0]} 👋
+          {greeting(now.getHours())}, {user.name.split(" ")[0]}
         </p>
         <p className="hidden text-xs text-muted sm:block">
           {now.toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}

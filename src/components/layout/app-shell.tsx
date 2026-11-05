@@ -7,7 +7,7 @@ import { authClient } from "@/lib/auth/auth-client";
 import { canAccess } from "@/lib/auth/roles";
 import { EmptyState } from "@/components/ui/misc";
 import { LinkButton } from "@/components/ui/button";
-import { LogoLoader } from "@/components/ui/logo-loader";
+import { BrandLoader } from "@/components/ui/brand-loader";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 
@@ -61,5 +61,5 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 export function ShellLoading() {
-  return <LogoLoader fullScreen />;
+  return <BrandLoader fullScreen />;
 }

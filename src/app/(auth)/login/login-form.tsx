@@ -68,12 +68,14 @@ export function LoginForm() {
         </Link>
       </p>
 
-      <div className="mt-10 rounded-3xl bg-surface p-5">
-        <p className="text-sm font-extrabold">Demo accounts</p>
-        <p className="mt-0.5 text-xs text-muted">
+      <details className="group mt-8 rounded-3xl bg-surface px-5 py-4">
+        <summary className="cursor-pointer list-none text-sm font-bold text-muted marker:hidden hover:text-ink">
+          Try a demo account <span className="inline-block transition-transform group-open:rotate-90">›</span>
+        </summary>
+        <p className="mt-2 text-xs text-muted">
           Mock data only. Pick a role to fill the form (password: <code className="font-bold">{DEMO_PASSWORD}</code>).
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {DEMO_ACCOUNTS.map((a) => (
             <button
               key={a.email}
@@ -91,7 +93,7 @@ export function LoginForm() {
             </button>
           ))}
         </div>
-      </div>
+      </details>
     </>
   );
 }

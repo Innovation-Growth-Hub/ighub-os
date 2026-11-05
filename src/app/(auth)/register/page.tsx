@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { CircleAlert } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
+import { AuthFrame } from "@/components/auth/auth-frame";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 
@@ -29,7 +30,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <>
+    <AuthFrame message="Join the hub!">
       <h1 className="text-3xl font-extrabold tracking-tight">Create your account</h1>
       <p className="mt-1 text-muted">New accounts join as students. An admin can change your role.</p>
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -57,6 +58,6 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
-    </>
+    </AuthFrame>
   );
 }
