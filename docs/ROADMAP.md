@@ -1,6 +1,6 @@
 # IGHUB OS: Product Development Timeline
 
-**Stack:** Next.js 16 (App Router) · Better Auth · Node.js API · PostgreSQL
+**Stack:** Next.js 16 (App Router) · Better Auth · NestJS API · MySQL 8 (Drizzle). Details in [BACKEND-ARCHITECTURE.md](BACKEND-ARCHITECTURE.md)
 **Approach:** UI first on mock data, then replace the mock layer module by module.
 **Start:** Wed 4 Nov 2026 · **Target v1.0 launch:** Mon 12 Apr 2027 (~23 weeks)
 
@@ -14,7 +14,7 @@
 | 1 | Core ops UI hardening | 9 Nov – 4 Dec | 4 | Staff, attendance, tasks and dashboard ready for user testing |
 | 2 | Business modules UI | 7 Dec – 18 Dec | 2 | Projects, CRM, finance, documents and meetings complete on mock data |
 | – | Holiday freeze | 21 Dec – 1 Jan | 2 | Bug fixes only. Kids Code Camp runs. |
-| 3 | Backend foundation | 4 Jan – 29 Jan 2027 | 4 | Node API, Postgres, Better Auth + RBAC, first modules live |
+| 3 | Backend foundation | 4 Jan – 29 Jan 2027 | 4 | NestJS API, MySQL, Better Auth + RBAC, first modules live |
 | 4 | Integration | 1 Feb – 5 Mar | 5 | Every module on the real API; QR, uploads, email and jobs working |
 | 5 | Intelligence & growth | 8 Mar – 26 Mar | 3 | LMS depth, social publishing, reports, AI insights |
 | 6 | Hardening & pilot | 29 Mar – 9 Apr | 2 | QA, security, performance, staff pilot at Umuahia HQ |
@@ -54,7 +54,7 @@ The modules people will use every day get polished first.
 
 ## Phase 3: Backend foundation (4 – 29 Jan 2027)
 
-- **Service:** Node.js API. Recommended: Hono or Fastify with Drizzle ORM on PostgreSQL. Run it as a separate service so a future mobile app can reuse it.
+- **Service:** NestJS API with Drizzle ORM on MySQL 8, in a monorepo with the web app. See [BACKEND-ARCHITECTURE.md](BACKEND-ARCHITECTURE.md).
 - **Auth:** Better Auth server (email/password and sessions) with the `admin` plugin for roles. Swap `src/lib/auth/auth-client.ts` to `createAuthClient()` and `proxy.ts` to `getSessionCookie()`.
 - **Authorization:** move the `ROUTE_ACCESS` table and the `visibleProjects`-style row rules to the API, and enforce them on every endpoint
 - **Data layer in the app:** TanStack Query hooks that keep the shape of the current store selectors, so components barely change

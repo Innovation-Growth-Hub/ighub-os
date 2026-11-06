@@ -14,10 +14,14 @@ import { ColumnChart } from "@/components/charts/column-chart";
 import { Heatmap } from "@/components/charts/heatmap";
 import { BarList } from "@/components/charts/bar-list";
 import { MiniCalendar, RecentActivity, UpcomingSchedule } from "./shared";
+import { FundRequestsCard } from "./fund-requests-card";
+import { DailyLogCard } from "./daily-log-card";
+import { useCurrentUser } from "@/lib/auth/auth-client";
 
 const SATISFACTION = 73; // PRD §7.1 — from the quarterly pulse survey (mock)
 
 export function AdminDashboard() {
+  const user = useCurrentUser();
   const { users, attendance, tasks, transactions, meetings } = useDb();
   const team = workers(users);
   const latestDate = attendanceDates(attendance)[0];
@@ -49,6 +53,11 @@ export function AdminDashboard() {
         <StatTile label="On-time rate (latest day)" value={`${onTimeRate}%`} icon={Clock} delta={4} deltaLabel="vs last week" />
         <StatTile label="Open tasks" value={String(openTasks.length)} icon={ListTodo} delta={-12} deltaLabel="vs last week" upIsGood={false} />
         <StatTile label="Revenue (YTD)" value={formatNairaCompact(revenue)} icon={Wallet} delta={18} deltaLabel="vs last year" />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <DailyLogCard user={user} />
+        <FundRequestsCard user={user} className="xl:col-span-2" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">

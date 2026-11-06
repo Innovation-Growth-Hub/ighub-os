@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { ChevronLeft, Mail, MapPin, Pencil, Phone, UserX } from "lucide-react";
+import { ChevronLeft, KeyRound, Mail, MapPin, Pencil, Phone, UserX } from "lucide-react";
 import { computePenalties, useDb } from "@/lib/store";
-import { ROLE_LABELS } from "@/lib/auth/roles";
+import { authClient, generateTempPassword, useCurrentUser } from "@/lib/auth/auth-client";
+import { canManageAccounts, ROLE_LABELS } from "@/lib/auth/roles";
 import { OFFICES } from "@/lib/mock/seed";
 import { formatDate, formatNaira, formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,11 +16,15 @@ import { Avatar, EmptyState, StatTile } from "@/components/ui/misc";
 import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
 import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { STAFF_TYPE_LABELS, StaffForm } from "@/components/staff/staff-form";
+import { Credentials } from "@/components/staff/credentials";
 
 export default function StaffProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const me = useCurrentUser();
   const { users, attendance, tasks, lateRequests, updateUser } = useDb();
+  const canManage = canManageAccounts(me.role);
   const [editing, setEditing] = useState(false);
+  const [resetTo, setResetTo] = useState<string | null>(null);
   const user = users.find((u) => u.id === id);
 
   if (!user) {
@@ -44,6 +49,7 @@ export default function StaffProfilePage() {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-extrabold tracking-tight">{user.name}</h1>
             <StatusBadge status={user.isActive ? "active" : "inactive"} />
+            {user.mustChangePassword && <StatusBadge status="must_change_password" />}
           </div>
           <p className="text-muted">{user.position} · {ROLE_LABELS[user.role]}</p>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
@@ -53,12 +59,28 @@ export default function StaffProfilePage() {
             {user.staffType && <Badge tone="mint">{STAFF_TYPE_LABELS[user.staffType]}</Badge>}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => updateUser(user.id, { isActive: !user.isActive })}>
-            {user.isActive ? "Deactivate" : "Reactivate"}
-          </Button>
-          <Button onClick={() => setEditing(true)}><Pencil className="size-4" /> Edit</Button>
-        </div>
+        {canManage && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                if (!confirm(`Reset ${user.name}'s password? They'll have to set a new one when they next log in.`)) return;
+                const password = generateTempPassword();
+                const { error } = await authClient.admin.setUserPassword({ userId: user.id, newPassword: password });
+                if (error) return alert(error.message);
+                setResetTo(password);
+              }}
+            >
+              <KeyRound className="size-4" /> Reset password
+            </Button>
+            {user.id !== me.id && (
+              <Button variant="secondary" onClick={() => updateUser(user.id, { isActive: !user.isActive })}>
+                {user.isActive ? "Deactivate" : "Reactivate"}
+              </Button>
+            )}
+            <Button onClick={() => setEditing(true)}><Pencil className="size-4" /> Edit</Button>
+          </div>
+        )}
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-4">
@@ -100,6 +122,10 @@ export default function StaffProfilePage() {
           </ul>
         </Card>
       </div>
+
+      <Modal open={resetTo !== null} onClose={() => setResetTo(null)} title="Password reset">
+        {resetTo && <Credentials reset user={user} password={resetTo} onDone={() => setResetTo(null)} />}
+      </Modal>
 
       <Modal open={editing} onClose={() => setEditing(false)} title={`Edit ${user.name}`}>
         <StaffForm

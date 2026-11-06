@@ -1,8 +1,10 @@
 /**
  * Mock seed data. Deterministic (seeded PRNG) so every browser starts from the
- * same state. Replaced by the API + Postgres seeders once the backend exists.
+ * same state. Replaced by the API + MySQL seeders once the backend exists.
  */
 import type {
+  DailyLog,
+  FundRequest,
   Activity,
   Attendance,
   AttendanceStatus,
@@ -32,6 +34,12 @@ export const OFFICES: Record<OfficeLocation, string> = {
 /** Demo password for every seeded account (PRD §10.3). */
 export const DEMO_PASSWORD = "password";
 
+/** Shortest password the mock (and later Better Auth) accepts. */
+export const MIN_PASSWORD_LENGTH = 8;
+
+/** The accountant can approve fund requests below this alone; larger ones go to the super admin. */
+export const ACCOUNTANT_APPROVAL_LIMIT = 50_000;
+
 // ---------- Users ----------
 
 export const seedUsers: User[] = [
@@ -39,6 +47,7 @@ export const seedUsers: User[] = [
   { id: "u_admin", name: "Ngozi Eze", email: "admin@ighub.com", role: "admin", position: "Operations Lead", staffType: "core_team", officeLocation: "umuahia_hq", isActive: true, joinedAt: "2022-03-02", phone: "+234 803 111 0002" },
   { id: "u_staff", name: "Emeka Nwosu", email: "staff@ighub.com", role: "staff", position: "Frontend Developer", staffType: "core_team", officeLocation: "umuahia_hq", isActive: true, joinedAt: "2023-06-12", phone: "+234 803 111 0003" },
   { id: "u_pm", name: "Adaeze Uche", email: "pm@ighub.com", role: "project_manager", position: "Project Manager", staffType: "core_team", officeLocation: "aba_hub", isActive: true, joinedAt: "2023-02-20", phone: "+234 803 111 0004" },
+  { id: "u_acct", name: "Chinwe Okeke", email: "accounts@ighub.com", role: "accountant", position: "Accountant", staffType: "core_team", officeLocation: "umuahia_hq", isActive: true, joinedAt: "2023-04-17", phone: "+234 803 111 0007" },
   { id: "u_social", name: "Tobi Adeyemi", email: "social@ighub.com", role: "social_media_manager", position: "Social Media Manager", staffType: "core_team", officeLocation: "umuahia_hq", isActive: true, joinedAt: "2024-01-08", phone: "+234 803 111 0005" },
   { id: "u_trainer", name: "Ifeanyi Obi", email: "trainer@ighub.com", role: "trainer", position: "Lead Trainer", staffType: "core_team", officeLocation: "aba_hub", isActive: true, joinedAt: "2023-09-01", phone: "+234 803 111 0006" },
   { id: "u_s2", name: "Blessing Okoro", email: "blessing@ighub.com", role: "staff", position: "Backend Developer", staffType: "core_team", officeLocation: "umuahia_hq", isActive: true, joinedAt: "2023-11-15" },
@@ -337,6 +346,100 @@ export const seedSocialPosts: SocialPost[] = [
   { id: "sp_4", accountId: "sa_ig", content: "Meet the team: our NYSC corpers share what they've learned.", scheduledAt: "2026-11-06T17:00:00" },
   { id: "sp_5", accountId: "sa_fb", content: "Abia Tech Meetup recap + photos.", scheduledAt: "2026-10-25T15:00:00", publishedAt: "2026-10-25T15:00:00", likes: 310, shares: 22 },
   { id: "sp_6", accountId: "sa_li", content: "Hiring: Backend developer (Node.js) for our Umuahia studio.", scheduledAt: "2026-11-08T10:00:00" },
+];
+
+// ---------- Fund requests ----------
+
+export const seedFundRequests: FundRequest[] = [
+  {
+    id: "fr_1", requesterId: "u_staff", title: "Test devices for VFD merchant app", purpose: "Two mid-range Android phones to test the merchant QR flow on real hardware.",
+    amount: 320_000, category: "Equipment", neededBy: "2026-11-13", projectId: "p_vfd", status: "pending_review", createdAt: "2026-11-05T10:20:00",
+    attachments: [{ id: "fa_1", kind: "quote", name: "Slot quote - Tecno Spark 20 x2.pdf", sizeKb: 96, uploadedBy: "u_staff", uploadedAt: "2026-11-05T10:20:00" }],
+    history: [{ at: "2026-11-05T10:20:00", actorId: "u_staff", action: "submitted" }],
+  },
+  {
+    id: "fr_2", requesterId: "u_s4", title: "Kids Code Camp snacks & banners", purpose: "Refreshments for 60 kids over 3 days plus two roll-up banners for Aba Hub.",
+    amount: 185_000, category: "Events", neededBy: "2026-11-18", status: "forwarded", createdAt: "2026-11-03T14:05:00",
+    attachments: [{ id: "fa_2", kind: "quote", name: "Banner print quote.jpg", sizeKb: 412, uploadedBy: "u_s4", uploadedAt: "2026-11-03T14:05:00" }],
+    history: [
+      { at: "2026-11-03T14:05:00", actorId: "u_s4", action: "submitted" },
+      { at: "2026-11-04T09:30:00", actorId: "u_acct", action: "forwarded", note: "Within the events budget. Quotes attached on the shared drive." },
+    ],
+  },
+  {
+    id: "fr_3", requesterId: "u_pm", title: "LTE backup data for Aba Hub", purpose: "Fibre outage last week cost us a client demo. Three months of backup data.",
+    amount: 90_000, category: "Internet", neededBy: "2026-11-07", status: "approved", createdAt: "2026-10-30T11:00:00",
+    attachments: [],
+    history: [
+      { at: "2026-10-30T11:00:00", actorId: "u_pm", action: "submitted" },
+      { at: "2026-10-30T15:10:00", actorId: "u_acct", action: "forwarded" },
+      { at: "2026-10-31T08:45:00", actorId: "u_super", action: "approved", note: "Approved. Please buy the 3-month bundle, not monthly." },
+    ],
+  },
+  {
+    id: "fr_4", requesterId: "u_s2", title: "Conference ticket: DevFest Lagos", purpose: "Ticket and transport for DevFest Lagos.",
+    amount: 250_000, category: "Events", neededBy: "2026-11-20", status: "rejected", createdAt: "2026-10-27T09:00:00",
+    attachments: [],
+    history: [
+      { at: "2026-10-27T09:00:00", actorId: "u_s2", action: "submitted" },
+      { at: "2026-10-28T10:00:00", actorId: "u_acct", action: "rejected", note: "Learning budget for Q4 is used up. Please resubmit in January." },
+    ],
+  },
+  {
+    id: "fr_5", requesterId: "u_s3", title: "Figma Professional seat", purpose: "Annual Figma seat for client design work.",
+    amount: 120_000, category: "Equipment", neededBy: "2026-10-25", status: "disbursed", createdAt: "2026-10-20T13:00:00",
+    attachments: [{ id: "fa_3", kind: "receipt", name: "Figma invoice Oct 2026.pdf", sizeKb: 58, uploadedBy: "u_s3", uploadedAt: "2026-10-23T09:00:00" }],
+    history: [
+      { at: "2026-10-20T13:00:00", actorId: "u_s3", action: "submitted" },
+      { at: "2026-10-21T09:00:00", actorId: "u_acct", action: "forwarded" },
+      { at: "2026-10-21T16:30:00", actorId: "u_super", action: "approved" },
+      { at: "2026-10-22T10:15:00", actorId: "u_acct", action: "disbursed", note: "Paid by bank transfer." },
+    ],
+  },
+];
+
+// ---------- Daily logs ----------
+
+export const seedDailyLogs: DailyLog[] = [
+  {
+    id: "log_u_staff_2026-11-05", userId: "u_staff", date: "2026-11-05", updatedAt: "2026-11-05T17:05:00",
+    entries: [
+      { id: "le_1", description: "Built the ID upload and selfie steps of the VFD KYC flow", hours: 5, taskId: "t_1" },
+      { id: "le_2", description: "VFD Phase 2 scoping call", hours: 1 },
+      { id: "le_3", description: "Code review for Blessing's webhook PR", hours: 1 },
+    ],
+    blockers: "Waiting on VFD for sandbox API keys.",
+  },
+  {
+    id: "log_u_staff_2026-11-04", userId: "u_staff", date: "2026-11-04", updatedAt: "2026-11-04T17:20:00",
+    entries: [
+      { id: "le_4", description: "VFD onboarding: phone verification screen + validation", hours: 6, taskId: "t_1" },
+      { id: "le_5", description: "Outlined e-Gov API docs structure", hours: 1.5, taskId: "t_9" },
+    ],
+  },
+  {
+    id: "log_u_s2_2026-11-05", userId: "u_s2", date: "2026-11-05", updatedAt: "2026-11-05T16:50:00",
+    entries: [
+      { id: "le_6", description: "Payment webhook handler: signature check and retries", hours: 6, taskId: "t_2" },
+      { id: "le_7", description: "Fixed a timezone bug in attendance reports", hours: 1 },
+    ],
+  },
+  {
+    id: "log_u_s4_2026-11-05", userId: "u_s4", date: "2026-11-05", updatedAt: "2026-11-05T17:30:00",
+    entries: [
+      { id: "le_8", description: "Drafted and sent the weekly community newsletter", hours: 3, taskId: "t_4" },
+      { id: "le_9", description: "Called 12 parents about Kids Code Camp registration", hours: 3 },
+    ],
+    blockers: "Need banner budget approved before printing.",
+  },
+  {
+    id: "log_u_acct_2026-11-05", userId: "u_acct", date: "2026-11-05", updatedAt: "2026-11-05T17:00:00",
+    entries: [
+      { id: "le_10", description: "Reconciled October bank statements", hours: 4 },
+      { id: "le_11", description: "Reviewed 3 fund requests", hours: 1 },
+      { id: "le_12", description: "Followed up on overdue Abia State invoice IGH-2026-041", hours: 1 },
+    ],
+  },
 ];
 
 // ---------- Activity ----------

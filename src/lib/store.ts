@@ -15,10 +15,15 @@ import type {
   Communication,
   Contact,
   Course,
+  DailyLog,
+  DailyLogEntry,
   Deal,
   DealStage,
   DocumentFile,
   Enrollment,
+  FundRequest,
+  FundRequestAttachment,
+  FundRequestEvent,
   Invoice,
   LateRequest,
   Meeting,
@@ -61,11 +66,29 @@ interface Db {
   socialAccounts: SocialAccount[];
   socialPosts: SocialPost[];
   activities: Activity[];
+  fundRequests: FundRequest[];
+  dailyLogs: DailyLog[];
+  /**
+   * MOCK ONLY: plaintext passwords by user id, in localStorage. Better Auth
+   * stores salted scrypt hashes in its `account` table on the server.
+   */
+  passwords: Record<string, string>;
 }
+
+export type FundRequestInput = Pick<FundRequest, "title" | "purpose" | "amount" | "category" | "neededBy" | "projectId">;
+
+/** File metadata from an <input type="file">. Mock upload; the API will use presigned URLs. */
+export type FileMeta = { name: string; sizeKb: number };
+
+/** Reviewer actions. Who may take which action is checked in lib/fund-requests.ts. */
+export type FundRequestDecision = Exclude<FundRequestEvent["action"], "submitted">;
 
 interface Actions {
   // staff
   addUser: (u: Omit<User, "id" | "joinedAt" | "isActive">) => User;
+  /** Account + password in one step (Better Auth: `admin.createUser`). */
+  createAccount: (u: Omit<User, "id" | "joinedAt" | "isActive">, password: string) => User;
+  setPassword: (userId: string, password: string, mustChange: boolean) => void;
   updateUser: (id: string, patch: Partial<User>) => void;
   deleteUser: (id: string) => void;
   // attendance
@@ -100,6 +123,12 @@ interface Actions {
   setMeetingStatus: (id: string, status: MeetingStatus) => void;
   // social
   schedulePost: (p: Omit<SocialPost, "id">) => void;
+  // fund requests
+  submitFundRequest: (requesterId: string, r: FundRequestInput, quotes: FileMeta[]) => void;
+  attachToFundRequest: (id: string, userId: string, kind: FundRequestAttachment["kind"], files: FileMeta[]) => void;
+  // daily logs
+  saveDailyLog: (userId: string, date: string, entries: DailyLogEntry[], blockers?: string) => void;
+  decideFundRequest: (id: string, actorId: string, decision: FundRequestDecision, note?: string) => void;
   // misc
   log: (actorId: string, message: string) => void;
   resetDemo: () => void;
@@ -123,7 +152,20 @@ const initialDb = (): Db => ({
   socialAccounts: seed.seedSocialAccounts,
   socialPosts: seed.seedSocialPosts,
   activities: seed.seedActivities,
+  fundRequests: seed.seedFundRequests,
+  dailyLogs: seed.seedDailyLogs,
+  passwords: Object.fromEntries(seed.seedUsers.map((u) => [u.id, seed.DEMO_PASSWORD])),
 });
+
+const toAttachments = (files: FileMeta[], kind: FundRequestAttachment["kind"], userId: string): FundRequestAttachment[] =>
+  files.map((f) => ({ ...f, id: uid("fa"), kind, uploadedBy: userId, uploadedAt: new Date().toISOString() }));
+
+const NEXT_STATUS: Record<FundRequestDecision, FundRequest["status"]> = {
+  forwarded: "forwarded",
+  approved: "approved",
+  rejected: "rejected",
+  disbursed: "disbursed",
+};
 
 export const useDb = create<Db & Actions>()(
   persist(
@@ -135,6 +177,16 @@ export const useDb = create<Db & Actions>()(
         set((s) => ({ users: [...s.users, user] }));
         return user;
       },
+      createAccount: (u, password) => {
+        const user = get().addUser({ ...u, mustChangePassword: true });
+        set((s) => ({ passwords: { ...s.passwords, [user.id]: password } }));
+        return user;
+      },
+      setPassword: (userId, password, mustChange) =>
+        set((s) => ({
+          passwords: { ...s.passwords, [userId]: password },
+          users: s.users.map((u) => (u.id === userId ? { ...u, mustChangePassword: mustChange } : u)),
+        })),
       updateUser: (id, patch) =>
         set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
       deleteUser: (id) => set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
@@ -263,6 +315,57 @@ export const useDb = create<Db & Actions>()(
 
       schedulePost: (p) => set((s) => ({ socialPosts: [{ ...p, id: uid("sp") }, ...s.socialPosts] })),
 
+      submitFundRequest: (requesterId, r, quotes) => {
+        const at = new Date().toISOString();
+        set((s) => ({
+          fundRequests: [
+            {
+              ...r,
+              id: uid("fr"),
+              requesterId,
+              status: "pending_review",
+              createdAt: at,
+              history: [{ at, actorId: requesterId, action: "submitted" }],
+              attachments: toAttachments(quotes, "quote", requesterId),
+            },
+            ...s.fundRequests,
+          ],
+        }));
+        get().log(requesterId, `requested funds: “${r.title}”`);
+      },
+      decideFundRequest: (id, actorId, decision, note) => {
+        const req = get().fundRequests.find((r) => r.id === id);
+        if (!req) return;
+        const at = new Date().toISOString();
+        set((s) => ({
+          fundRequests: s.fundRequests.map((r) =>
+            r.id === id
+              ? { ...r, status: NEXT_STATUS[decision], history: [...r.history, { at, actorId, action: decision, note: note || undefined }] }
+              : r,
+          ),
+        }));
+        // Paying out a request books it as an expense.
+        if (decision === "disbursed") {
+          get().addTransaction({ kind: "expense", amount: req.amount, category: req.category, date: toDateKey(new Date()), description: `Fund request: ${req.title}` });
+        }
+        get().log(actorId, `${decision} the fund request “${req.title}”`);
+      },
+
+      attachToFundRequest: (id, userId, kind, files) =>
+        set((s) => ({
+          fundRequests: s.fundRequests.map((r) =>
+            r.id === id ? { ...r, attachments: [...r.attachments, ...toAttachments(files, kind, userId)] } : r,
+          ),
+        })),
+
+      saveDailyLog: (userId, date, entries, blockers) => {
+        const id = `log_${userId}_${date}`;
+        const isNew = !get().dailyLogs.some((l) => l.id === id);
+        const row: DailyLog = { id, userId, date, entries, blockers: blockers || undefined, updatedAt: new Date().toISOString() };
+        set((s) => ({ dailyLogs: [row, ...s.dailyLogs.filter((l) => l.id !== id)] }));
+        if (isNew) get().log(userId, `logged ${entries.length} task${entries.length === 1 ? "" : "s"} for today`);
+      },
+
       log: (actorId, message) =>
         set((s) => ({
           activities: [{ id: uid("a"), actorId, message, at: new Date().toISOString() }, ...s.activities].slice(0, 50),
@@ -271,7 +374,9 @@ export const useDb = create<Db & Actions>()(
     }),
     {
       name: "ighub-os-db",
-      version: 1,
+      version: 3,
+      // v2 added accounts, the accountant role and fund requests; v3 daily logs and attachments: reseed.
+      migrate: () => initialDb() as unknown as Db & Actions,
       // Persist data only, never the action functions.
       partialize: (s) =>
         Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== "function")) as unknown as Db,

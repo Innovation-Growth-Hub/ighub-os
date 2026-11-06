@@ -66,6 +66,10 @@ const STATUS: Record<string, { tone: Tone; icon: LucideIcon; label: string }> = 
   paid: { tone: "good", icon: CircleCheck, label: "Paid" },
   overdue: { tone: "critical", icon: CircleAlert, label: "Overdue" },
   inactive: { tone: "neutral", icon: CircleX, label: "Inactive" },
+  pending_review: { tone: "warning", icon: Hourglass, label: "With accountant" },
+  forwarded: { tone: "info", icon: Clock, label: "Awaiting approval" },
+  disbursed: { tone: "good", icon: CircleCheck, label: "Paid out" },
+  must_change_password: { tone: "warning", icon: CircleAlert, label: "Awaiting first login" },
 };
 
 export function StatusBadge({ status }: { status: string }) {

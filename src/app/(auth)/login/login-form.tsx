@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { CircleAlert } from "lucide-react";
@@ -12,16 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
+/** Demo shortcuts for the roles that are live today. */
 const DEMO_ACCOUNTS: Array<{ role: Role; email: string }> = [
   { role: "super_admin", email: "superadmin@ighub.com" },
   { role: "admin", email: "admin@ighub.com" },
   { role: "staff", email: "staff@ighub.com" },
   { role: "project_manager", email: "pm@ighub.com" },
-  { role: "trainer", email: "trainer@ighub.com" },
-  { role: "student", email: "student@ighub.com" },
-  { role: "social_media_manager", email: "social@ighub.com" },
-  { role: "client", email: "client@partner.com" },
+  { role: "accountant", email: "accounts@ighub.com" },
 ];
+
+/** Only follow same-site relative paths. */
+function safeNext(next: string | null) {
+  return next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -35,11 +37,14 @@ export function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await authClient.signIn.email({ email, password });
+    const { data, error } = await authClient.signIn.email({ email, password });
     setLoading(false);
     if (error) return setError(error.message);
-    // Only follow same-site relative paths.
-    router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
+    if (data.user.mustChangePassword) {
+      router.replace(`/change-password?next=${encodeURIComponent(safeNext(next))}`);
+      return;
+    }
+    router.replace(safeNext(next));
   }
 
   return (
@@ -53,7 +58,7 @@ export function LoginForm() {
         </Field>
         {error && (
           <p role="alert" className="flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
-            <CircleAlert className="size-4" aria-hidden /> {error}
+            <CircleAlert className="size-4 shrink-0" aria-hidden /> {error}
           </p>
         )}
         <Button type="submit" size="lg" className="w-full justify-center" disabled={loading}>
@@ -62,10 +67,9 @@ export function LoginForm() {
       </form>
 
       <p className="mt-6 text-center text-sm text-muted">
-        New here?{" "}
-        <Link href="/register" className="font-bold text-primary-ink hover:underline">
-          Create an account
-        </Link>
+        Accounts are created by the IGHub super admin.
+        <br />
+        Forgot your password? Ask them to reset it.
       </p>
 
       <details className="group mt-8 rounded-3xl bg-surface px-5 py-4">
@@ -74,6 +78,7 @@ export function LoginForm() {
         </summary>
         <p className="mt-2 text-xs text-muted">
           Mock data only. Pick a role to fill the form (password: <code className="font-bold">{DEMO_PASSWORD}</code>).
+          Social media manager, trainer, student and client accounts are coming soon.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {DEMO_ACCOUNTS.map((a) => (

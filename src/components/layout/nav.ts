@@ -1,10 +1,12 @@
 import {
   BarChart3,
   CalendarDays,
+  ClipboardList,
   Clock,
   FileText,
   FolderKanban,
   GraduationCap,
+  HandCoins,
   Handshake,
   LayoutDashboard,
   ListTodo,
@@ -33,6 +35,7 @@ export const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { href: "/staff", label: "Staff", icon: Users },
       { href: "/attendance", label: "Attendance", icon: Clock },
       { href: "/tasks", label: "Tasks", icon: ListTodo },
+      { href: "/daily-logs", label: "Daily logs", icon: ClipboardList },
     ],
   },
   {
@@ -48,6 +51,7 @@ export const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   {
     title: "Business",
     items: [
+      { href: "/requests", label: "Fund requests", icon: HandCoins },
       { href: "/finance", label: "Finance", icon: Wallet },
       { href: "/social", label: "Social Media", icon: Megaphone },
       { href: "/reports", label: "Reports", icon: BarChart3 },

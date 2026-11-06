@@ -3,9 +3,9 @@
 import { useState, type DragEvent, type FormEvent } from "react";
 import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
-import { isAdmin } from "@/lib/auth/roles";
+import { canManageTasks, isAdmin } from "@/lib/auth/roles";
+import { assignableUsers, canManageTask, managedProjects } from "@/lib/access";
 import { useDb, userById } from "@/lib/store";
-import { workers } from "@/lib/attendance";
 import type { Priority, Task, TaskStatus } from "@/lib/types";
 import { cn, formatDate, toDateKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,19 +22,28 @@ const COLUMNS: Array<{ status: TaskStatus; label: string }> = [
 
 export default function TasksPage() {
   const user = useCurrentUser();
-  const { tasks, users, projects, addTask, moveTask, deleteTask } = useDb();
-  const canManage = isAdmin(user.role) || user.role === "project_manager";
+  const { tasks, users, projects, addTask, moveTask, deleteTask, log } = useDb();
+  // Admins and PMs run the whole board; everyone else works their own tasks.
+  const canManage = canManageTasks(user.role);
   const [scope, setScope] = useState<"mine" | "all">(canManage ? "all" : "mine");
   const [creating, setCreating] = useState(false);
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
   const [today] = useState(() => toDateKey(new Date()));
 
-  const visible = tasks.filter((t) => scope === "all" || t.assignedTo === user.id);
+  // PMs only see and manage tasks on the projects they run (or that they created).
+  const manages = (t: Task) => canManageTask(t, projects, user);
+  const visible = tasks.filter((t) => (canManage && scope === "all" && manages(t)) || t.assignedTo === user.id);
+  const canMove = (t: Task) => manages(t) || t.assignedTo === user.id;
+  const assignees = assignableUsers(users, projects, user);
+  const projectChoices = isAdmin(user.role) ? projects : managedProjects(projects, user);
 
   function onDrop(e: DragEvent, status: TaskStatus) {
     e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain");
-    if (id) moveTask(id, status);
+    const task = tasks.find((t) => t.id === e.dataTransfer.getData("text/plain"));
+    if (task && canMove(task)) {
+      moveTask(task.id, status);
+      if (status === "complete" && task.status !== "complete") log(user.id, `completed “${task.title}”`);
+    }
     setDragOver(null);
   }
 
@@ -59,10 +68,14 @@ export default function TasksPage() {
     <>
       <PageHeader
         title="Tasks"
-        description="Drag cards between columns, or use the status menu on each card."
+        description={
+          canManage
+            ? "Drag cards between columns, or use the status menu on each card."
+            : "Your tasks. Drag a card to update its status, or move it to Complete when you're done."
+        }
         actions={
           <>
-            <Pills label="Task scope" value={scope} onChange={setScope} options={[{ value: "mine", label: "My tasks" }, { value: "all", label: "All tasks" }]} />
+            {canManage && <Pills label="Task scope" value={scope} onChange={setScope} options={[{ value: "mine", label: "My tasks" }, { value: "all", label: isAdmin(user.role) ? "All tasks" : "My projects" }]} />}
             {canManage && <Button onClick={() => setCreating(true)}><Plus className="size-4" /> New task</Button>}
           </>
         }
@@ -94,8 +107,12 @@ export default function TasksPage() {
                     task={t}
                     assignee={userById(users, t.assignedTo)?.name ?? "Unassigned"}
                     overdue={t.status !== "complete" && t.dueDate < today}
-                    canDelete={canManage}
-                    onMove={(s) => moveTask(t.id, s)}
+                    canDelete={manages(t)}
+                    canMove={canMove(t)}
+                    onMove={(s) => {
+                      moveTask(t.id, s);
+                      if (s === "complete" && t.status !== "complete") log(user.id, `completed “${t.title}”`);
+                    }}
                     onDelete={() => deleteTask(t.id)}
                   />
                 ))}
@@ -110,9 +127,9 @@ export default function TasksPage() {
           <Field label="Title" htmlFor="title"><Input id="title" name="title" required /></Field>
           <Field label="Description" htmlFor="description"><Textarea id="description" name="description" /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Assign to" htmlFor="assignedTo">
+            <Field label="Assign to" htmlFor="assignedTo" hint={isAdmin(user.role) ? undefined : "People on your projects."}>
               <Select id="assignedTo" name="assignedTo" required>
-                {workers(users).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {assignees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </Select>
             </Field>
             <Field label="Due date" htmlFor="dueDate"><Input id="dueDate" name="dueDate" type="date" required defaultValue={today} /></Field>
@@ -126,7 +143,7 @@ export default function TasksPage() {
             <Field label="Project" htmlFor="projectId">
               <Select id="projectId" name="projectId" defaultValue="">
                 <option value="">None</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projectChoices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
             </Field>
           </div>
@@ -143,6 +160,7 @@ function TaskCard({
   assignee,
   overdue,
   canDelete,
+  canMove,
   onMove,
   onDelete,
 }: {
@@ -150,14 +168,15 @@ function TaskCard({
   assignee: string;
   overdue: boolean;
   canDelete: boolean;
+  canMove: boolean;
   onMove: (s: TaskStatus) => void;
   onDelete: () => void;
 }) {
   return (
     <li
-      draggable
+      draggable={canMove}
       onDragStart={(e) => e.dataTransfer.setData("text/plain", task.id)}
-      className="cursor-grab rounded-3xl bg-canvas p-4 active:cursor-grabbing"
+      className={cn("rounded-3xl bg-canvas p-4", canMove && "cursor-grab active:cursor-grabbing")}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="font-bold">{task.title}</p>
@@ -177,7 +196,7 @@ function TaskCard({
           {formatDate(task.dueDate, { year: undefined })}
         </span>
         <div className="ml-auto flex items-center gap-1">
-          <label>
+          <label className={cn(!canMove && "hidden")}>
             <span className="sr-only">Status for {task.title}</span>
             <select
               value={task.status}

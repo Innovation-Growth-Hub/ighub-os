@@ -1,8 +1,10 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { ROLE_LABELS } from "@/lib/auth/roles";
-import { OFFICES } from "@/lib/mock/seed";
+import { useState, type FormEvent } from "react";
+import { RefreshCw } from "lucide-react";
+import { generateTempPassword } from "@/lib/auth/auth-client";
+import { COMING_SOON_ROLES, LIVE_ROLES, ROLE_LABELS } from "@/lib/auth/roles";
+import { MIN_PASSWORD_LENGTH, OFFICES } from "@/lib/mock/seed";
 import type { OfficeLocation, Role, StaffType, User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
@@ -13,31 +15,45 @@ export const STAFF_TYPE_LABELS: Record<StaffType, string> = {
   intern: "Intern",
 };
 
-const STAFF_ROLES: Role[] = ["staff", "admin", "project_manager", "trainer", "social_media_manager", "super_admin"];
-
 export type StaffInput = Pick<User, "name" | "email" | "role" | "position" | "phone" | "staffType" | "officeLocation">;
 
+/**
+ * Create (with a temporary password) or edit an account. Only the super admin
+ * sees this form. Coming-soon roles are listed but can't be picked yet.
+ */
 export function StaffForm({
   initial,
   onSubmit,
   submitLabel,
+  withPassword = false,
+  error,
+  busy,
 }: {
   initial?: Partial<User>;
-  onSubmit: (v: StaffInput) => void;
+  onSubmit: (v: StaffInput, password?: string) => void;
   submitLabel: string;
+  withPassword?: boolean;
+  error?: string | null;
+  busy?: boolean;
 }) {
+  const [password, setPassword] = useState(() => (withPassword ? generateTempPassword() : ""));
+
   function handle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    onSubmit({
-      name: String(f.get("name")),
-      email: String(f.get("email")),
-      phone: String(f.get("phone")) || undefined,
-      position: String(f.get("position")),
-      role: f.get("role") as Role,
-      staffType: f.get("staffType") as StaffType,
-      officeLocation: f.get("officeLocation") as OfficeLocation,
-    });
+    onSubmit(
+      {
+        name: String(f.get("name")),
+        email: String(f.get("email")),
+        phone: String(f.get("phone")) || undefined,
+        position: String(f.get("position")),
+        // A disabled (coming-soon) option isn't submitted, so keep the current role.
+        role: (f.get("role") as Role | null) ?? (initial?.role as Role),
+        staffType: f.get("staffType") as StaffType,
+        officeLocation: f.get("officeLocation") as OfficeLocation,
+      },
+      withPassword ? password : undefined,
+    );
   }
 
   return (
@@ -50,22 +66,25 @@ export function StaffForm({
           <Input id="email" name="email" type="email" required defaultValue={initial?.email} />
         </Field>
         <Field label="Position" htmlFor="position">
-          <Input id="position" name="position" required defaultValue={initial?.position} />
+          <Input id="position" name="position" required defaultValue={initial?.position} placeholder="e.g. Frontend Developer" />
         </Field>
         <Field label="Phone" htmlFor="phone">
           <Input id="phone" name="phone" type="tel" defaultValue={initial?.phone} />
+        </Field>
+        <Field label="Role" htmlFor="role">
+          <Select id="role" name="role" defaultValue={initial?.role ?? "staff"}>
+            {LIVE_ROLES.map((r) => (
+              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+            ))}
+            {COMING_SOON_ROLES.map((r) => (
+              <option key={r} value={r} disabled>{ROLE_LABELS[r]} (coming soon)</option>
+            ))}
+          </Select>
         </Field>
         <Field label="Staff type" htmlFor="staffType">
           <Select id="staffType" name="staffType" defaultValue={initial?.staffType ?? "core_team"}>
             {Object.entries(STAFF_TYPE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Role" htmlFor="role">
-          <Select id="role" name="role" defaultValue={initial?.role ?? "staff"}>
-            {STAFF_ROLES.map((r) => (
-              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
             ))}
           </Select>
         </Field>
@@ -76,8 +95,32 @@ export function StaffForm({
             ))}
           </Select>
         </Field>
+        {withPassword && (
+          <Field
+            label="Temporary password"
+            htmlFor="password"
+            hint="Share this with them privately. They'll be asked to change it the first time they log in."
+            className="sm:col-span-2"
+          >
+            <div className="flex gap-2">
+              <Input
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={MIN_PASSWORD_LENGTH}
+                required
+                autoComplete="off"
+                className="font-mono"
+              />
+              <Button variant="secondary" size="icon" onClick={() => setPassword(generateTempPassword())} aria-label="Generate a new password">
+                <RefreshCw className="size-4" />
+              </Button>
+            </div>
+          </Field>
+        )}
       </div>
-      <Button type="submit" className="w-full justify-center">{submitLabel}</Button>
+      {error && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{error}</p>}
+      <Button type="submit" className="w-full justify-center" disabled={busy}>{busy ? "Saving…" : submitLabel}</Button>
     </form>
   );
 }

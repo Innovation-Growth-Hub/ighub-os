@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { Eye, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { useDb } from "@/lib/store";
-import { ROLE_LABELS } from "@/lib/auth/roles";
+import { authClient, useCurrentUser } from "@/lib/auth/auth-client";
+import { canManageAccounts, ROLE_LABELS } from "@/lib/auth/roles";
 import { OFFICES } from "@/lib/mock/seed";
-import type { StaffType } from "@/lib/types";
+import type { StaffType, User } from "@/lib/types";
 import { workers } from "@/lib/attendance";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,14 +17,20 @@ import { Avatar, EmptyState, PageHeader, Pills } from "@/components/ui/misc";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { STAFF_TYPE_LABELS, StaffForm } from "@/components/staff/staff-form";
+import { Credentials } from "@/components/staff/credentials";
 
 type Filter = "all" | StaffType;
 
 export default function StaffPage() {
-  const { users, addUser, deleteUser } = useDb();
+  const me = useCurrentUser();
+  const { users, deleteUser } = useDb();
+  const canManage = canManageAccounts(me.role);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState<{ user: User; password: string } | null>(null);
 
   // Staff = everyone internal, including inactive members.
   const staff = users.filter((u) => !["client", "student"].includes(u.role));
@@ -39,7 +46,13 @@ export default function StaffPage() {
       <PageHeader
         title="Staff"
         description={`${workers(users).length} active team members across ${Object.keys(OFFICES).length} offices`}
-        actions={<Button onClick={() => setAdding(true)}><UserPlus className="size-4" /> Add staff</Button>}
+        actions={
+          canManage ? (
+            <Button onClick={() => { setError(null); setAdding(true); }}><UserPlus className="size-4" /> Create account</Button>
+          ) : (
+            <p className="text-sm text-muted">Only the super admin can create or remove accounts.</p>
+          )
+        }
       />
 
       <Card>
@@ -93,20 +106,22 @@ export default function StaffPage() {
                   <Td>{u.staffType && <Badge tone={u.staffType === "core_team" ? "mint" : "neutral"}>{STAFF_TYPE_LABELS[u.staffType]}</Badge>}</Td>
                   <Td className="whitespace-nowrap text-muted">{ROLE_LABELS[u.role]}</Td>
                   <Td className="whitespace-nowrap text-muted">{u.officeLocation ? OFFICES[u.officeLocation] : "—"}</Td>
-                  <Td><StatusBadge status={u.isActive ? "active" : "inactive"} /></Td>
+                  <Td><StatusBadge status={!u.isActive ? "inactive" : u.mustChangePassword ? "must_change_password" : "active"} /></Td>
                   <Td>
                     <div className="flex justify-end gap-1">
                       <Link href={`/staff/${u.id}`} aria-label={`View ${u.name}`} className="flex size-9 items-center justify-center rounded-full hover:bg-surface-2">
                         <Eye className="size-4" />
                       </Link>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${u.name}`}
-                        onClick={() => confirm(`Delete ${u.name}? This can't be undone.`) && deleteUser(u.id)}
-                        className="flex size-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+                      {canManage && u.id !== me.id && (
+                        <button
+                          type="button"
+                          aria-label={`Delete ${u.name}`}
+                          onClick={() => confirm(`Delete ${u.name}? This can't be undone.`) && deleteUser(u.id)}
+                          className="flex size-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      )}
                     </div>
                   </Td>
                 </Tr>
@@ -116,15 +131,27 @@ export default function StaffPage() {
         )}
       </Card>
 
-      <Modal open={adding} onClose={() => setAdding(false)} title="Add staff member">
+      <Modal open={adding} onClose={() => setAdding(false)} title="Create account">
         <StaffForm
-          submitLabel="Add staff member"
-          onSubmit={(v) => {
-            addUser(v);
+          withPassword
+          submitLabel="Create account"
+          error={error}
+          busy={busy}
+          onSubmit={async (v, password = "") => {
+            setBusy(true);
+            const { data, error } = await authClient.admin.createUser({ password, data: v });
+            setBusy(false);
+            if (error) return setError(error.message);
             setAdding(false);
+            setCreated({ user: data.user, password });
           }}
         />
+      </Modal>
+
+      <Modal open={created !== null} onClose={() => setCreated(null)} title="Account created">
+        {created && <Credentials user={created.user} password={created.password} onDone={() => setCreated(null)} />}
       </Modal>
     </>
   );
 }
+

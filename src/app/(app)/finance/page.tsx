@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { Banknote, Plus, Receipt, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { useDb, userById } from "@/lib/store";
+import { useCurrentUser } from "@/lib/auth/auth-client";
+import { canRecordFinance } from "@/lib/auth/roles";
 import { EXPENSE_CATEGORIES, INCOME_SOURCES } from "@/lib/mock/seed";
 import type { TransactionKind } from "@/lib/types";
 import { formatDate, formatNaira, formatNairaCompact, toDateKey } from "@/lib/utils";
@@ -17,6 +19,8 @@ import { ColumnChart } from "@/components/charts/column-chart";
 import { BarList } from "@/components/charts/bar-list";
 
 export default function FinancePage() {
+  const user = useCurrentUser();
+  const canRecord = canRecordFinance(user.role);
   const { transactions, invoices, users, addTransaction } = useDb();
   const [kind, setKind] = useState<"all" | TransactionKind>("all");
   const [adding, setAdding] = useState<TransactionKind | null>(null);
@@ -59,12 +63,14 @@ export default function FinancePage() {
     <>
       <PageHeader
         title="Finance"
-        description="Year to date"
+        description={canRecord ? "Year to date" : "Year to date · view only"}
         actions={
+          canRecord && (
           <>
             <Button variant="secondary" onClick={() => setAdding("expense")}><TrendingDown className="size-4" /> Record expense</Button>
             <Button onClick={() => setAdding("income")}><Plus className="size-4" /> Record income</Button>
           </>
+          )
         }
       />
 

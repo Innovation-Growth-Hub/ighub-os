@@ -10,8 +10,10 @@ import { Progress, StatTile } from "@/components/ui/misc";
 import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
 import { LinkButton } from "@/components/ui/button";
 import { MiniCalendar, RecentActivity, UpcomingSchedule } from "./shared";
+import { FundRequestsCard } from "./fund-requests-card";
+import { DailyLogCard } from "./daily-log-card";
 
-/** Dashboard for staff, PMs, trainers and social media managers. */
+/** Dashboard for staff, PMs and the accountant (the accountant also gets the fund request queue). */
 export function MemberDashboard({ user }: { user: User }) {
   const { attendance, tasks, projects, meetings, lateRequests } = useDb();
   const today = toDateKey(new Date());
@@ -51,6 +53,7 @@ export function MemberDashboard({ user }: { user: User }) {
           <div className="mt-6 flex flex-wrap gap-2">
             <LinkButton href="/attendance/clock">{todayRow && !todayRow.clockOut ? "Clock out" : "Clock in with QR"}</LinkButton>
             <LinkButton href="/attendance/late-requests" variant="secondary">Request late excuse</LinkButton>
+            <LinkButton href="/requests" variant="secondary">Request funds</LinkButton>
           </div>
         </Card>
         <Card>
@@ -79,6 +82,11 @@ export function MemberDashboard({ user }: { user: User }) {
         <StatTile label="Open tasks" value={String(open.length)} icon={ListTodo} />
         <StatTile label="On-time rate (last 20 days)" value={`${onTimeRate}%`} icon={Clock} />
         <StatTile label="Active projects" value={String(myProjects.filter((p) => p.status === "active").length)} icon={FolderKanban} />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <DailyLogCard user={user} />
+        <FundRequestsCard user={user} className="xl:col-span-2" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">

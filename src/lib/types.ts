@@ -1,6 +1,6 @@
 /**
  * Domain types. These mirror the PRD §8 schema and are the contract the
- * Node/Postgres backend will implement later — keep them in sync with the API.
+ * Node/MySQL backend will implement later — keep them in sync with the API.
  */
 
 export type Role =
@@ -11,6 +11,7 @@ export type Role =
   | "student"
   | "client"
   | "project_manager"
+  | "accountant"
   | "social_media_manager";
 
 export type StaffType = "core_team" | "corper" | "intern";
@@ -29,6 +30,8 @@ export interface User {
   isActive: boolean;
   joinedAt: string;
   company?: string; // clients
+  /** Set when the super admin creates the account or resets its password. */
+  mustChangePassword?: boolean;
 }
 
 export type AttendanceStatus = "on_time" | "late" | "absent";
@@ -231,4 +234,63 @@ export interface Activity {
   actorId: string;
   message: string;
   at: string;
+}
+
+/**
+ * Fund request flow:
+ * staff submits → accountant reviews (forward or reject) → super admin
+ * decides (approve or reject) → accountant disburses (records the expense).
+ */
+export type FundRequestStatus = "pending_review" | "forwarded" | "approved" | "rejected" | "disbursed";
+
+export interface FundRequestEvent {
+  at: string;
+  actorId: string;
+  action: "submitted" | "forwarded" | "approved" | "rejected" | "disbursed";
+  note?: string;
+}
+
+export interface FundRequest {
+  id: string;
+  requesterId: string;
+  title: string;
+  purpose: string;
+  amount: number;
+  category: string; // one of EXPENSE_CATEGORIES
+  neededBy: string; // YYYY-MM-DD
+  projectId?: string;
+  status: FundRequestStatus;
+  createdAt: string;
+  history: FundRequestEvent[];
+  attachments: FundRequestAttachment[];
+}
+
+/** Quotes go in with the request; receipts come back after the money is spent. */
+export interface FundRequestAttachment {
+  id: string;
+  kind: "quote" | "receipt";
+  name: string;
+  sizeKb: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+/**
+ * Daily work log (PRD §6.3 "Create daily reports"). One per person per day,
+ * editable until the day ends. The super admin can read every log.
+ */
+export interface DailyLogEntry {
+  id: string;
+  description: string;
+  hours?: number;
+  taskId?: string;
+}
+
+export interface DailyLog {
+  id: string; // `log_${userId}_${date}`
+  userId: string;
+  date: string; // YYYY-MM-DD
+  entries: DailyLogEntry[];
+  blockers?: string;
+  updatedAt: string;
 }

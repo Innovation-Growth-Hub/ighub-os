@@ -4,7 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // With Better Auth, replace this with `getSessionCookie(request)` from "better-auth/cookies".
 const SESSION_COOKIE = "ighub.session_token";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+// No public sign-up: the super admin creates every account.
+const PUBLIC_PATHS = ["/login"];
 
 /**
  * Optimistic check only: redirects based on cookie presence.

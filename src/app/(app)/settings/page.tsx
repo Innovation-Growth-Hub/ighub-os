@@ -4,7 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import { CircleCheck, RotateCcw } from "lucide-react";
 import { authClient, useCurrentUser } from "@/lib/auth/auth-client";
-import { isAdmin, ROLE_LABELS } from "@/lib/auth/roles";
+import { isSuperAdmin, ROLE_LABELS } from "@/lib/auth/roles";
+import { MIN_PASSWORD_LENGTH } from "@/lib/mock/seed";
 import { useDb } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -64,7 +65,7 @@ function Profile() {
       </div>
       <form onSubmit={onSubmit} onChange={() => setSaved(false)} className="space-y-4">
         <Field label="Full name" htmlFor="name"><Input id="name" name="name" required defaultValue={user.name} className="bg-canvas" /></Field>
-        <Field label="Email" htmlFor="email" hint="Contact an admin to change your email."><Input id="email" value={user.email} disabled className="bg-canvas opacity-70" /></Field>
+        <Field label="Email" htmlFor="email" hint="Ask the super admin to change your email."><Input id="email" value={user.email} disabled className="bg-canvas opacity-70" /></Field>
         <Field label="Phone" htmlFor="phone"><Input id="phone" name="phone" type="tel" defaultValue={user.phone} className="bg-canvas" /></Field>
         <div className="flex items-center gap-4"><Button type="submit">Save profile</Button><Saved show={saved} /></div>
       </form>
@@ -77,25 +78,38 @@ function Account() {
   const router = useRouter();
   const resetDemo = useDb((s) => s.resetDemo);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onChangePassword(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    setSaved(false);
+    if (f.get("new") !== f.get("confirm")) return setError("The new passwords don't match.");
+    const { error } = await authClient.changePassword({
+      currentPassword: String(f.get("current")),
+      newPassword: String(f.get("new")),
+      revokeOtherSessions: true,
+    });
+    if (error) return setError(error.message);
+    setError(null);
+    setSaved(true);
+    form.reset();
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
       <Card>
-        <CardHeader title="Password" description="Password changes go live with Better Auth. This form is a placeholder." />
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSaved(true);
-            e.currentTarget.reset();
-          }}
-          className="space-y-4"
-        >
-          <Field label="Current password" htmlFor="current"><Input id="current" type="password" autoComplete="current-password" required className="bg-canvas" /></Field>
-          <Field label="New password" htmlFor="new"><Input id="new" type="password" autoComplete="new-password" minLength={8} required className="bg-canvas" /></Field>
+        <CardHeader title="Password" description="Forgot it? Ask the super admin to reset it." />
+        <form onSubmit={onChangePassword} className="space-y-4">
+          <Field label="Current password" htmlFor="current"><Input id="current" name="current" type="password" autoComplete="current-password" required className="bg-canvas" /></Field>
+          <Field label="New password" htmlFor="new" hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}><Input id="new" name="new" type="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} required className="bg-canvas" /></Field>
+          <Field label="Confirm new password" htmlFor="confirm"><Input id="confirm" name="confirm" type="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} required className="bg-canvas" /></Field>
+          {error && <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">{error}</p>}
           <div className="flex items-center gap-4"><Button type="submit">Update password</Button><Saved show={saved} /></div>
         </form>
       </Card>
-      {isAdmin(user.role) && (
+      {isSuperAdmin(user.role) && (
         <Card>
           <CardHeader title="Demo data" description="Restore every module to the original mock dataset. Changes made in this browser are lost." />
           <Button

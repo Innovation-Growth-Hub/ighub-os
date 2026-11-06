@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Check, Clock, MapPin, Plus, X } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
-import { isAdmin } from "@/lib/auth/roles";
+import { canScheduleMeetings, isAdmin } from "@/lib/auth/roles";
 import { useDb, userById } from "@/lib/store";
 import { workers } from "@/lib/attendance";
 import type { MeetingStatus } from "@/lib/types";
@@ -24,6 +24,7 @@ export default function MeetingsPage() {
   const [participants, setParticipants] = useState<string[]>([user.id]);
   const [today] = useState(() => toDateKey(new Date()));
 
+  const canSchedule = canScheduleMeetings(user.role);
   const mine = isAdmin(user.role) ? meetings : meetings.filter((m) => m.participantIds.includes(user.id));
   const shown = mine.filter((m) => filter === "all" || m.status === filter).sort((a, b) => (filter === "scheduled" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start)));
 
@@ -46,7 +47,11 @@ export default function MeetingsPage() {
 
   return (
     <>
-      <PageHeader title="Meetings" description="Schedule, agendas and attendees" actions={<Button onClick={() => setCreating(true)}><Plus className="size-4" /> Schedule meeting</Button>} />
+      <PageHeader
+        title="Meetings"
+        description={canSchedule ? "Schedule, agendas and attendees" : "Meetings you've been invited to"}
+        actions={canSchedule && <Button onClick={() => setCreating(true)}><Plus className="size-4" /> Schedule meeting</Button>}
+      />
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
           <Pills
@@ -58,7 +63,8 @@ export default function MeetingsPage() {
           {shown.length === 0 && <p className="rounded-3xl bg-surface p-6 text-sm text-muted">No meetings here.</p>}
           {shown.map((m) => {
             const start = new Date(m.start);
-            const canManage = isAdmin(user.role) || m.participantIds[0] === user.id;
+            // The organiser is the first participant.
+            const canManage = isAdmin(user.role) || (canSchedule && m.participantIds[0] === user.id);
             return (
               <Card key={m.id} className="flex flex-col gap-5 sm:flex-row">
                 <div className="flex w-20 shrink-0 flex-col items-center justify-center rounded-2xl bg-mint py-3">
