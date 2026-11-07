@@ -1,18 +1,18 @@
 # IGHubOs: Backend Architecture
 
-**Status:** Decided · **Stack:** NestJS 11 · Drizzle ORM · MySQL 8 · Better Auth · **Companion docs:** [AUTH-ARCHITECTURE.md](AUTH-ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md)
+**Status:** Decided · **Stack:** NestJS 12 (ESM) · Drizzle ORM · MySQL 8 · Better Auth · **Companion docs:** [AUTH-ARCHITECTURE.md](AUTH-ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md)
 
 > Library APIs named here (Better Auth, `nestjs-zod`, Drizzle) match their docs as of writing. Re-check signatures when you start Phase 3.
 
 ## 1. The decision
 
-**A standalone NestJS API (TypeScript, Express adapter), in one monorepo with the Next.js app, backed by MySQL 8 through Drizzle ORM. Better Auth runs inside the API.**
+**A standalone NestJS 12 API (TypeScript, ESM, Express 5 adapter), in one monorepo with the Next.js app, backed by MySQL 8 through Drizzle ORM. Better Auth runs inside the API.**
 
 ```
 ighubos/                       pnpm workspaces + Turborepo
   apps/
     web/        Next.js 16: UI only, no database access
-    api/        NestJS 11 on Node 22 LTS: Better Auth, business logic, jobs
+    api/        NestJS 12 on Node 22–24: Better Auth, business logic, jobs
   packages/
     db/         Drizzle schema (MySQL), migrations, seed
     shared/     zod schemas, domain types, roles & permission statements
@@ -38,10 +38,10 @@ Next.js stays a pure frontend. A bug there can't leak data, because it has no da
 | Choice | Why | Considered |
 |---|---|---|
 | **Node 22 LTS + TypeScript** | Same language and types end to end | – |
-| **NestJS 11** | Modules, dependency injection, guards and interceptors give every one of the ~14 modules the same shape. Guards map directly onto our RBAC and approval rules (fund requests, PM task scope). Familiar structure for anyone coming from Laravel. Swagger built in | Hono (smaller and faster to start, but we'd hand-build the structure Nest gives us); Express/Fastify alone (same problem) |
+| **NestJS 12** | Modules, dependency injection, guards and interceptors give every one of the ~14 modules the same shape. Guards map directly onto our RBAC and approval rules (fund requests, PM task scope). Familiar structure for anyone coming from Laravel. Swagger built in | Hono (smaller and faster to start, but we'd hand-build the structure Nest gives us); Express/Fastify alone (same problem) |
 | **MySQL 8** | Widely hosted (including Hostinger), InnoDB transactions, JSON columns, window functions; Better Auth + Drizzle support it fully | PostgreSQL |
 | **Drizzle ORM** | Schema is TypeScript in `packages/db`, shared by API, seed and tests; queries read like SQL, which matters for finance and attendance reports; Better Auth's CLI generates its tables for Drizzle | Prisma (also fine with Nest; generated client and its own schema language); TypeORM (Nest's old default; decorators-on-entities and weaker typing, avoid) |
-| **zod** (`nestjs-zod`) | One schema in `packages/shared` validates the request body in Nest (`ZodValidationPipe`), types the handler, feeds Swagger, and validates the same form in the browser | `class-validator` DTOs (Nest default, but can't be shared with the frontend) |
+| **zod 4** (own `ZodPipe`) | One schema in `packages/shared` validates the request body in Nest, types the handler, and validates the same form in the browser. `nestjs-zod` doesn't support Nest 12 yet, so `apps/api/src/common/zod.pipe.ts` does it in ~20 lines | `class-validator` DTOs (Nest default, but can't be shared with the frontend) |
 
 ## 2. Request lifecycle
 
@@ -50,13 +50,11 @@ Browser ──► os.ighub.com.ng (Next.js)
               │  /api/*  is rewritten by Next.js to api.ighub.com.ng
               ▼
             NestJS app (Express adapter)
-              ├─ helmet · request id · pino logger · CORS off (same origin)
+              ├─ helmet · Nest logger (JSON in production) · CORS off (same origin)
               ├─ /api/auth/*  ──► Better Auth handler (mounted before the body parser)
               └─ /api/v1/*
-                   ├─ SessionGuard      (global) auth.api.getSession({ headers }) → req.user
-                   ├─ ThrottlerGuard    per route class (auth / write / read)
-                   ├─ PermissionsGuard  @RequirePermission("finance", "view")
-                   ├─ ZodValidationPipe params, query, body
+                   ├─ AuthGuard         (global) origin check → session → banned/coming-soon → password_change_required → @AllowRoles(policy)
+                   ├─ ZodPipe           body (schemas from @ighub/shared)
                    ├─ controller        thin: calls the module's service
                    │     service        business rules + row rules (owner, assignee, PM's projects)
                    │     repository     Drizzle queries, transactions
@@ -70,14 +68,15 @@ Browser ──► os.ighub.com.ng (Next.js)
 Better Auth needs the raw request body on its routes, so Nest's body parser must not run first:
 
 ```ts
-// main.ts
-const app = await NestFactory.create(AppModule, { bodyParser: false });
-app.use("/api/auth", toNodeHandler(auth));           // better-auth/node
-app.use(express.json({ limit: "1mb" }));              // everything else
-app.setGlobalPrefix("api/v1", { exclude: ["api/auth/(.*)"] });
+// apps/api/src/bootstrap.ts (shared by main.ts and the e2e tests)
+const app = await NestFactory.create(AppModule.register(env), { bodyParser: false });
+const server = app.getHttpAdapter().getInstance();
+server.all("/api/auth/{*any}", toNodeHandler(app.get(AUTH)));   // better-auth/node, Express 5 path syntax
+app.use(express.json({ limit: "1mb" }));                          // everything else
+app.setGlobalPrefix("api/v1");
 ```
 
-The community package `@thallesp/nestjs-better-auth` wraps this (plus `@Session()` and `@AllowAnonymous()` decorators). Evaluate it in week 1; the manual version above is about 30 lines if it doesn't fit.
+We mount it by hand (not `@thallesp/nestjs-better-auth`) to keep one less dependency between us and Nest 12.
 
 ## 3. Inside `apps/api`
 
@@ -85,10 +84,13 @@ The community package `@thallesp/nestjs-better-auth` wraps this (plus `@Session(
 apps/api/src/
   main.ts                    bootstrap, Better Auth mount, graceful shutdown
   app.module.ts              imports every module below
-  auth/                      auth.ts (betterAuth({ database: drizzleAdapter(db, { provider: "mysql" }), plugins })),
-                             session.guard.ts, permissions.guard.ts, @RequirePermission(), @CurrentUser()
-  common/                    env (zod-validated), logger, problem+json filter, clock (Africa/Lagos), mailer, storage
-  db/                        DrizzleModule: mysql2 pool → `DRIZZLE` provider, injected into repositories
+  auth/                      auth.ts (Better Auth: drizzle adapter, admin plugin + access control, hooks),
+                             auth.guard.ts, decorators (@Public, @AllowRoles, @AllowPendingPasswordChange, @CurrentUser)
+  config/env.ts              zod-validated environment (refuses to boot misconfigured)
+  common/                    problem+json filter, ZodPipe, AuditService; later: clock (Africa/Lagos), mailer, storage
+  db/                        DbModule: mysql2 pool → `DB` provider, injected into repositories
+  accounts/                  ✅ sprint 1: /me, list, create, update, deactivate, reset password
+  health/                    ✅ sprint 1: GET /api/v1/health (DB ping)
   modules/
     staff/                   staff.module.ts · .controller.ts · .service.ts · .repository.ts · .service.spec.ts
     attendance/              QR verify, clock in/out, late requests, penalties
@@ -136,10 +138,10 @@ New tables beyond the PRD §8 list: `daily_logs` + `daily_log_entries`, `fund_re
 | Email | Nodemailer over SMTP (Hostinger mailbox) behind a `MailerService` | v1 sends only reminders; login details are shared by the super admin by hand |
 | Files | `StorageService`: local disk outside any public folder; S3-compatible (R2) later | Documents, quotes and receipts. Upload via the API with size/type limits; served only through authorized routes |
 | Jobs | hPanel cron runs `node dist/jobs/<job>.js` (Nest application context, no HTTP) + MySQL `GET_LOCK` | `@nestjs/schedule` only for local dev |
-| Rate limiting | Better Auth limiter for auth routes; `@nestjs/throttler` with MySQL-backed storage for `/api/v1` | In-memory limits break with more than one instance |
-| Logs / errors | `nestjs-pino` JSON logs with `requestId`; Sentry for API and web | |
+| Rate limiting | Better Auth limiter for auth routes (5 sign-ins/min); `/api/v1` limits later | Memory storage is fine for one instance |
+| Logs / errors | Nest `ConsoleLogger` (JSON in production); Sentry for API and web later | Add pino if we need request ids |
 | Config | `env.ts` validates every variable with zod at boot | The app refuses to start misconfigured |
-| API docs | `@nestjs/swagger` + `nestjs-zod` → `/api/v1/openapi.json` | Source for the typed frontend client |
+| API docs | `/api/v1/openapi.json` from the zod schemas (zod 4 `toJSONSchema`), added in sprint 2 | Source for the typed frontend client |
 
 ## 6. How the frontend talks to it
 
@@ -153,8 +155,8 @@ New tables beyond the PRD §8 list: `daily_logs` + `daily_log_entries`, `fund_re
 
 | Gate | Tooling |
 |---|---|
-| Unit tests (services, permission matrix, fund request transitions, penalty math, lateness in Lagos time) | Jest (Nest default) |
-| Integration tests against real MySQL | Jest + Supertest + Testcontainers (`mysql:8`) |
+| Unit tests (services, permission matrix, fund request transitions, penalty math, lateness in Lagos time) | Vitest 4 (Nest 12 default) |
+| Integration tests against real MySQL | Vitest + Supertest against a local `ighubos_test` database (wiped and migrated per run); Testcontainers in CI |
 | API contract | OpenAPI diff in CI: breaking changes fail the build |
 | E2E per role | Playwright against staging |
 | CI on every PR | typecheck · lint · test · build · migration dry-run |
@@ -183,9 +185,9 @@ ighub.com.ng         unchanged (existing public website)
 | Files | Local disk under the API app, outside any public folder; served only through authorized API routes |
 | Backups | Hostinger automatic backups **plus** a nightly `mysqldump` cron copied offsite (e.g. R2 or Google Drive) |
 | Environments | `os.` / `api.` for production; `staging-os.` / `staging-api.` with a separate database |
-| Local dev | `docker compose up`: MySQL 8 + Mailpit on the developer machine; `pnpm dev` runs web + api |
+| Local dev | Local MySQL 8 service (no Docker needed); `pnpm dev` runs web + api + package watchers |
 
-**Capacity:** a Nest API idles at roughly 100–150 MB. 4 GB RAM covers web, API and MySQL for a hub-sized team. Watch memory after launch.
+**Capacity:** a Nest API idles at roughly 100–150 MB. **Node:** Hostinger runs Node 18–24, so production targets Node 22 or 24 (`engines: >=22.12`, needed for Better Auth + Nest 12 ESM). 4 GB RAM covers web, API and MySQL for a hub-sized team. Watch memory after launch.
 
 **When to move to a VPS:** if we need Redis, WebSockets at scale, more than one API instance, or root-level control. The code doesn't change; only the deploy target does.
 
@@ -201,9 +203,9 @@ ighub.com.ng         unchanged (existing public website)
 
 | Step | What | Output |
 |---|---|---|
-| 0 | **Monorepo move** (can start now, no backend needed): today's app → `apps/web`, create `packages/shared` from `lib/types.ts`, `roles.ts`, `access.ts`, `fund-requests.ts` | Web app runs unchanged from the new path |
-| 1 | `packages/db`: MySQL schema for auth + staff + attendance; Docker Compose; seed | `pnpm db:migrate && pnpm db:seed` works locally |
-| 2 | `apps/api` skeleton: `nest new`, env, logger, problem+json filter, DrizzleModule, Better Auth (email/password + admin plugin), guards | Sign-in via `curl` returns a session cookie |
+| 0 ✅ | **Monorepo move** (can start now, no backend needed): today's app → `apps/web`, create `packages/shared` from `lib/types.ts`, `roles.ts`, `access.ts`, `fund-requests.ts` | Web app runs unchanged from the new path |
+| 1 ✅ | `packages/db`: MySQL schema for auth + audit log; seed (attendance tables come with step 4) | `pnpm db:migrate && pnpm db:seed` works locally |
+| 2 | `apps/api` skeleton: env, logger, problem+json filter, DbModule, Better Auth (email/password + admin plugin), guards, accounts | ✅ Sprint 1. Sign-in returns a session cookie; e2e covers the account lifecycle |
 | 3 | Frontend auth switch-over (auth doc §9) | Every live role logs in for real; first-login password change works |
 | 4 | Staff + attendance + daily logs on the API (QR signing, Lagos-time lateness, penalties job) | The daily-use modules are live end to end |
 | 5 | Tasks, fund requests + finance, then the remaining modules, one per PR, behind the `dataSource` switch | Mock store deleted |
