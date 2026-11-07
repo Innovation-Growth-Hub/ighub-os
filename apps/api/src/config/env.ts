@@ -7,6 +7,8 @@ const schema = z.object({
   DATABASE_URL: z.string().startsWith("mysql://", "DATABASE_URL must be a mysql:// URL"),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
   BETTER_AUTH_URL: z.url(),
+  /** Where uploads are stored. On Hostinger: a folder outside public_html. */
+  UPLOAD_DIR: z.string().min(1).default("./uploads"),
   WEB_ORIGINS: z
     .string()
     .transform((s) => s.split(",").map((o) => o.trim()).filter(Boolean))

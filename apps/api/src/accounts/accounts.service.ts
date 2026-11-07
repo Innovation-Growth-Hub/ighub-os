@@ -84,6 +84,10 @@ export class AccountsService {
     return account!;
   }
 
+  updateSelf(id: string, input: { name?: string; phone?: string }) {
+    return this.repo.update(id, { ...input, phone: input.phone === undefined ? undefined : input.phone || null });
+  }
+
   /** Deactivate = Better Auth ban (also revokes every session). */
   async setActive(id: string, active: boolean, actor: Actor) {
     await this.get(id);

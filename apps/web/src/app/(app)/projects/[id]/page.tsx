@@ -5,17 +5,21 @@ import { useParams } from "next/navigation";
 import { ChevronLeft, Circle, CircleCheck, FolderX } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { isAdmin } from "@ighub/shared";
-import { projectProgress, useDb, userById } from "@/lib/store";
 import { formatDate, formatNaira } from "@/lib/utils";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Avatar, EmptyState, Progress, StatTile } from "@/components/ui/misc";
 import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
 import { visibleProjects } from "@ighub/shared";
+import { useActions, useProjects, useTasks, useUsers } from "@/lib/api/hooks";
+import { projectProgress, userById } from "@/lib/derived";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser();
-  const { projects, users, tasks, toggleMilestone } = useDb();
+  const projects = useProjects();
+  const users = useUsers();
+  const tasks = useTasks();
+  const { toggleMilestone } = useActions();
   const project = visibleProjects(projects, user).find((p) => p.id === id);
 
   if (!project) {
@@ -24,7 +28,6 @@ export default function ProjectDetailPage() {
 
   const canEdit = isAdmin(user.role) || project.managerId === user.id;
   const showMoney = isAdmin(user.role) || user.role === "project_manager";
-  const client = userById(users, project.clientId);
   const pm = userById(users, project.managerId);
   const pct = projectProgress(project);
   const burn = project.budget ? Math.round((project.spent / project.budget) * 100) : 0;
@@ -38,7 +41,7 @@ export default function ProjectDetailPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-bold text-muted">{client?.company ?? "Internal project"}</p>
+          <p className="text-sm font-bold text-muted">{project.clientName ?? "Internal project"}</p>
           <h1 className="text-3xl font-extrabold tracking-tight">{project.name}</h1>
           <p className="mt-2 max-w-2xl text-muted">{project.description}</p>
         </div>
@@ -82,9 +85,6 @@ export default function ProjectDetailPage() {
             <ul className="space-y-3">
               {pm && (
                 <li className="flex items-center gap-3"><Avatar name={pm.name} size="sm" /><div className="text-sm"><p className="font-bold">{pm.name}</p><p className="text-xs text-muted">Project manager</p></div></li>
-              )}
-              {client && (
-                <li className="flex items-center gap-3"><Avatar name={client.name} size="sm" /><div className="text-sm"><p className="font-bold">{client.name}</p><p className="text-xs text-muted">Client · {client.company}</p></div></li>
               )}
               {project.teamIds.map((tid) => {
                 const u = userById(users, tid);

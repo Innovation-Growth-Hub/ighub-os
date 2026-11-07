@@ -5,3 +5,4 @@ export * from "./access.js";
 export * from "./fund-requests.js";
 export * from "./schemas.js";
 export * from "./passwords.js";
+export * from "./schemas-domain.js";

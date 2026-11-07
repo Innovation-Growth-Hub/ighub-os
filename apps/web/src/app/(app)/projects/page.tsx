@@ -5,17 +5,19 @@ import { useState } from "react";
 import { FolderKanban, Plus } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { isAdmin } from "@ighub/shared";
-import { projectProgress, useDb, userById } from "@/lib/store";
 import type { ProjectStatus } from "@ighub/shared";
 import { visibleProjects } from "@ighub/shared";
 import { formatDate, formatNairaCompact } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
 import { Avatar, EmptyState, PageHeader, Pills, Progress } from "@/components/ui/misc";
 import { StatusBadge } from "@/components/ui/badge";
+import { useProjects, useUsers } from "@/lib/api/hooks";
+import { projectProgress, userById } from "@/lib/derived";
 
 export default function ProjectsPage() {
   const user = useCurrentUser();
-  const { projects, users } = useDb();
+  const projects = useProjects();
+  const users = useUsers();
   const [status, setStatus] = useState<"all" | ProjectStatus>("all");
   const mine = visibleProjects(projects, user);
   const shown = mine.filter((p) => status === "all" || p.status === status);
@@ -49,11 +51,10 @@ export default function ProjectsPage() {
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {shown.map((p) => {
             const pct = projectProgress(p);
-            const client = userById(users, p.clientId);
             return (
               <Link key={p.id} href={`/projects/${p.id}`} className="flex flex-col rounded-3xl bg-surface p-6 transition-colors hover:bg-surface-2">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-bold text-muted">{client?.company ?? "Internal"}</p>
+                  <p className="text-xs font-bold text-muted">{p.clientName ?? "Internal"}</p>
                   <StatusBadge status={p.status} />
                 </div>
                 <h2 className="mt-2 text-lg font-extrabold tracking-tight">{p.name}</h2>

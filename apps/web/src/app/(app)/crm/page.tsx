@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import { Mail, MessageSquare, Phone, Plus, Search, Users, Video } from "lucide-react";
-import { useDb } from "@/lib/store";
 import type { Communication, Contact } from "@ighub/shared";
 import { cn, formatDate, formatNairaCompact } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,13 +11,17 @@ import { Modal } from "@/components/ui/modal";
 import { Avatar, EmptyState, PageHeader, Pills } from "@/components/ui/misc";
 import { Badge } from "@/components/ui/badge";
 import { CrmTabs } from "@/components/crm/crm-tabs";
+import { useActions, useCommunications, useContacts, useDeals } from "@/lib/api/hooks";
 
 type Segment = Contact["segment"];
 const SEGMENTS: Record<Segment, string> = { corporate: "Corporate", government: "Government", startup: "Startup", ngo: "NGO" };
 const COMM_ICON = { call: Phone, email: Mail, meeting: Video };
 
 export default function CrmContactsPage() {
-  const { contacts, deals, communications, addContact, addCommunication } = useDb();
+  const contacts = useContacts();
+  const deals = useDeals();
+  const communications = useCommunications();
+  const { addContact, addCommunication } = useActions();
   const [segment, setSegment] = useState<"all" | Segment>("all");
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(contacts[0]?.id ?? null);

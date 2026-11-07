@@ -1,10 +1,18 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
-/** Where the NestJS API runs. The browser never calls it directly (see rewrites). */
+/**
+ * Where the NestJS API runs. The browser never calls it directly (see rewrites).
+ * Read at BUILD time (rewrites are baked into the build), so production builds
+ * must set API_ORIGIN=https://api.ighub.com.ng.
+ */
 const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:4000";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Self-contained server for Hostinger: .next/standalone/apps/web/server.js
+  output: "standalone",
+  // Trace files from the monorepo root so @ighub/shared is bundled.
+  outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

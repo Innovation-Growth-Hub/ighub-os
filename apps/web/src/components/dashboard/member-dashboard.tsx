@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CircleCheck, Clock, FolderKanban, ListTodo, QrCode } from "lucide-react";
-import { computePenalties, PENALTY_THRESHOLD, projectProgress, useDb } from "@/lib/store";
+import { useState } from "react";
+import { AlertTriangle, CircleCheck, FolderKanban, ListTodo } from "lucide-react";
 import type { User } from "@ighub/shared";
-import { formatDate, formatTime, toDateKey, weekStart } from "@/lib/utils";
+import { formatDate, formatTime, toDateKey } from "@/lib/utils";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Progress, StatTile } from "@/components/ui/misc";
 import { PriorityBadge, StatusBadge } from "@/components/ui/badge";
@@ -12,75 +12,42 @@ import { LinkButton } from "@/components/ui/button";
 import { MiniCalendar, RecentActivity, UpcomingSchedule } from "./shared";
 import { FundRequestsCard } from "./fund-requests-card";
 import { DailyLogCard } from "./daily-log-card";
+import { useMeetings, useProjects, useTasks } from "@/lib/api/hooks";
+import { projectProgress } from "@/lib/derived";
 
 /** Dashboard for staff, PMs and the accountant (the accountant also gets the fund request queue). */
 export function MemberDashboard({ user }: { user: User }) {
-  const { attendance, tasks, projects, meetings, lateRequests } = useDb();
-  const today = toDateKey(new Date());
-  const todayRow = attendance.find((a) => a.userId === user.id && a.date === today);
+  const tasks = useTasks();
+  const projects = useProjects();
+  const meetings = useMeetings();
+  const [today] = useState(() => toDateKey(new Date()));
   const myTasks = tasks.filter((t) => t.assignedTo === user.id);
   const open = myTasks.filter((t) => t.status !== "complete");
+  const overdue = open.filter((t) => t.dueDate < today);
   const myProjects = projects.filter((p) => p.teamIds.includes(user.id) || p.managerId === user.id);
   const myMeetings = meetings.filter((m) => m.participantIds.includes(user.id));
-
-  const mine = attendance.filter((a) => a.userId === user.id);
-  const thisWeek = weekStart(today);
-  const latesThisWeek = mine.filter((a) => a.status === "late" && weekStart(a.date) === thisWeek).length;
-  const recent = mine.slice(-20);
-  const onTimeRate = recent.length ? Math.round((recent.filter((a) => a.status === "on_time").length / recent.length) * 100) : 0;
-  const penalties = computePenalties(mine, lateRequests);
+  const nextMeeting = myMeetings.filter((m) => m.status === "scheduled" && m.start >= new Date().toISOString())[0];
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card tone="mint" className="flex flex-col justify-between lg:col-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-bold text-muted">Today</p>
-              <p className="mt-1 text-2xl font-extrabold tracking-tight">
-                {todayRow?.clockOut
-                  ? "You're clocked out. See you tomorrow!"
-                  : todayRow
-                    ? `Clocked in at ${formatTime(todayRow.clockIn!)}`
-                    : "You haven't clocked in yet"}
-              </p>
-              {todayRow && <div className="mt-2"><StatusBadge status={todayRow.status} /></div>}
-            </div>
-            <span className="hidden size-14 items-center justify-center rounded-full bg-canvas sm:flex">
-              <QrCode className="size-7 text-primary-ink" aria-hidden />
-            </span>
-          </div>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <LinkButton href="/attendance/clock">{todayRow && !todayRow.clockOut ? "Clock out" : "Clock in with QR"}</LinkButton>
-            <LinkButton href="/attendance/late-requests" variant="secondary">Request late excuse</LinkButton>
-            <LinkButton href="/requests" variant="secondary">Request funds</LinkButton>
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Lateness this week" />
-          <p className="text-4xl font-extrabold">
-            {latesThisWeek}
-            <span className="text-lg text-muted"> / {PENALTY_THRESHOLD}</span>
-          </p>
-          <Progress
-            value={(latesThisWeek / PENALTY_THRESHOLD) * 100}
-            tone={latesThisWeek >= PENALTY_THRESHOLD ? "critical" : latesThisWeek > 0 ? "warning" : "primary"}
-            className="mt-4"
-            label="Late days this week"
-          />
-          <p className="mt-3 flex items-start gap-2 text-sm text-muted">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
-            {PENALTY_THRESHOLD}+ late days in a week incurs a ₦5,000 penalty.
-          </p>
-          {penalties.length > 0 && (
-            <p className="mt-2 text-xs font-bold text-red-700">{penalties.length} penalty week(s) on record</p>
-          )}
-        </Card>
-      </div>
+      <Card tone="mint">
+        <p className="text-sm font-bold text-muted">Today</p>
+        <p className="mt-1 text-2xl font-extrabold tracking-tight">
+          {open.length === 0 ? "You're all caught up." : `You have ${open.length} open task${open.length === 1 ? "" : "s"}${overdue.length ? `, ${overdue.length} overdue` : ""}.`}
+        </p>
+        {nextMeeting && (
+          <p className="mt-1 text-sm text-muted">Next meeting: {nextMeeting.title}, {formatDate(nextMeeting.start, { weekday: "short", year: undefined })} at {formatTime(nextMeeting.start)}</p>
+        )}
+        <div className="mt-6 flex flex-wrap gap-2">
+          <LinkButton href="/daily-logs">Log today&apos;s work</LinkButton>
+          <LinkButton href="/tasks" variant="secondary">Open my tasks</LinkButton>
+          <LinkButton href="/requests" variant="secondary">Request funds</LinkButton>
+        </div>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile label="Open tasks" value={String(open.length)} icon={ListTodo} />
-        <StatTile label="On-time rate (last 20 days)" value={`${onTimeRate}%`} icon={Clock} />
+        <StatTile label="Overdue" value={String(overdue.length)} icon={AlertTriangle} />
         <StatTile label="Active projects" value={String(myProjects.filter((p) => p.status === "active").length)} icon={FolderKanban} />
       </div>
 

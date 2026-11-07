@@ -2,9 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { MIN_PASSWORD_LENGTH } from "@ighub/shared";
 import { CircleAlert } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
-import { MIN_PASSWORD_LENGTH } from "@/lib/mock/seed";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { BrandLoader } from "@/components/ui/brand-loader";
@@ -18,21 +18,17 @@ export function ChangePasswordForm() {
   const router = useRouter();
   const rawNext = useSearchParams().get("next");
   const next = rawNext?.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
-  const { data: session } = authClient.useSession();
-  const [mounted, setMounted] = useState(false);
+  const { data: session, isPending, refetch } = authClient.useSession();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client hydration flag
-  useEffect(() => setMounted(true), []);
-
   useEffect(() => {
-    if (!mounted) return;
-    if (!session) authClient.signOut().then(() => router.replace("/login"));
+    if (isPending) return;
+    if (!session) authClient.signOut().finally(() => router.replace("/login"));
     else if (!session.user.mustChangePassword) router.replace(next);
-  }, [mounted, session, router, next]);
+  }, [isPending, session, router, next]);
 
-  if (!mounted || !session?.user.mustChangePassword) return <BrandLoader className="min-h-64" />;
+  if (isPending || !session?.user.mustChangePassword) return <BrandLoader className="min-h-64" />;
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -47,7 +43,9 @@ export function ChangePasswordForm() {
       revokeOtherSessions: true,
     });
     setLoading(false);
-    if (error) return setError(error.message);
+    if (error) return setError(error.status === 400 || error.status === 401 ? "Your temporary password is incorrect." : error.message ?? "Couldn't save. Try again.");
+    // The API cleared the "must change" flag; reload the session before leaving.
+    await refetch();
     router.replace(next);
   }
 

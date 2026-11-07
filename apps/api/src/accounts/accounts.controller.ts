@@ -6,7 +6,9 @@ import {
   isAdmin,
   setAccountStatusSchema,
   updateAccountSchema,
+  updateMeSchema,
   type CreateAccountInput,
+  type UpdateMeInput,
   type SetAccountStatusInput,
   type UpdateAccountInput,
 } from "@ighub/shared";
@@ -30,6 +32,22 @@ export class AccountsController {
   @AllowPendingPasswordChange()
   me(@CurrentUser() user: AuthUser) {
     return this.accounts.get(user.id);
+  }
+
+  /** Edit your own name and phone. */
+  @Patch("me")
+  updateMe(@CurrentUser() user: AuthUser, @Body(new ZodPipe(updateMeSchema)) body: UpdateMeInput) {
+    return this.accounts.updateSelf(user.id, body);
+  }
+
+  /**
+   * Everyone signed in can look up colleagues (names on tasks, meetings, logs).
+   * Phone numbers are only shown to admins.
+   */
+  @Get("directory")
+  async directory(@CurrentUser() user: AuthUser) {
+    const all = await this.accounts.list();
+    return isAdmin(user.role) ? all : all.map(({ phone: _phone, ...rest }) => rest);
   }
 
   /** Staff list: super admin and admin (admin is read-only). */

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Global, Inject, Injectable, Module } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { auditLog } from "@ighub/db";
 import { DB, type Database } from "../db/db.module.js";
 
@@ -21,7 +21,3 @@ export class AuditService {
     await this.db.insert(auditLog).values({ id: randomUUID(), ...entry });
   }
 }
-
-@Global()
-@Module({ providers: [AuditService], exports: [AuditService] })
-export class AuditModule {}

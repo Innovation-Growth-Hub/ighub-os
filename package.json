@@ -13,7 +13,9 @@
     "test": "turbo run test",
     "db:generate": "pnpm --filter @ighub/db db:generate",
     "db:migrate": "pnpm --filter @ighub/db db:migrate",
-    "db:seed": "pnpm --filter @ighub/db db:seed"
+    "db:seed": "pnpm --filter @ighub/db db:seed",
+    "db:create-admin": "pnpm --filter @ighub/db db:create-admin",
+    "package:deploy": "node scripts/package-deploy.mjs"
   },
   "devDependencies": {
     "turbo": "^2.11.10"

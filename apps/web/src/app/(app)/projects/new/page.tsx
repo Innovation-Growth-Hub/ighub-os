@@ -5,31 +5,31 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
-import { useDb } from "@/lib/store";
-import { workers } from "@/lib/attendance";
+import { workers } from "@ighub/shared";
 import type { ProjectStatus } from "@ighub/shared";
 import { cn, toDateKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Avatar, PageHeader } from "@/components/ui/misc";
+import { useActions, useUsers } from "@/lib/api/hooks";
 
 export default function NewProjectPage() {
   const user = useCurrentUser();
   const router = useRouter();
-  const { users, addProject } = useDb();
+  const users = useUsers();
+  const { addProject } = useActions();
   const [team, setTeam] = useState<string[]>([]);
   const [today] = useState(() => toDateKey(new Date()));
-  const clients = users.filter((u) => u.role === "client");
   const people = workers(users);
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    const p = addProject({
+    const p = await addProject({
       name: String(f.get("name")),
       description: String(f.get("description")),
-      clientId: String(f.get("clientId")) || undefined,
+      clientName: String(f.get("clientName")).trim() || undefined,
       managerId: String(f.get("managerId")),
       teamIds: team,
       startDate: String(f.get("startDate")),
@@ -37,7 +37,7 @@ export default function NewProjectPage() {
       budget: Number(f.get("budget")),
       status: f.get("status") as ProjectStatus,
     });
-    router.push(`/projects/${p.id}`);
+    if (p) router.push(`/projects/${p.id}`);
   }
 
   return (
@@ -51,11 +51,8 @@ export default function NewProjectPage() {
           <Field label="Project name" htmlFor="name"><Input id="name" name="name" required className="bg-canvas" /></Field>
           <Field label="Description" htmlFor="description"><Textarea id="description" name="description" required className="bg-canvas" /></Field>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Client" htmlFor="clientId">
-              <Select id="clientId" name="clientId" defaultValue="" className="bg-canvas">
-                <option value="">Internal project</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.company} · {c.name}</option>)}
-              </Select>
+            <Field label="Client (optional)" htmlFor="clientName" hint="Leave empty for an internal project.">
+              <Input id="clientName" name="clientName" placeholder="e.g. VFD Bank" className="bg-canvas" />
             </Field>
             <Field label="Project manager" htmlFor="managerId">
               <Select id="managerId" name="managerId" defaultValue={user.id} className="bg-canvas">

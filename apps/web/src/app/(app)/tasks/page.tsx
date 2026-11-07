@@ -5,7 +5,6 @@ import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { canManageTasks, isAdmin } from "@ighub/shared";
 import { assignableUsers, canManageTask, managedProjects } from "@ighub/shared";
-import { useDb, userById } from "@/lib/store";
 import type { Priority, Task, TaskStatus } from "@ighub/shared";
 import { cn, formatDate, toDateKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,8 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { Avatar, PageHeader, Pills } from "@/components/ui/misc";
 import { PriorityBadge, Tag } from "@/components/ui/badge";
+import { useActions, useProjects, useTasks, useUsers } from "@/lib/api/hooks";
+import { userById } from "@/lib/derived";
 
 const COLUMNS: Array<{ status: TaskStatus; label: string }> = [
   { status: "pending", label: "Pending" },
@@ -22,7 +23,10 @@ const COLUMNS: Array<{ status: TaskStatus; label: string }> = [
 
 export default function TasksPage() {
   const user = useCurrentUser();
-  const { tasks, users, projects, addTask, moveTask, deleteTask, log } = useDb();
+  const tasks = useTasks();
+  const users = useUsers();
+  const projects = useProjects();
+  const { addTask, moveTask, deleteTask } = useActions();
   // Admins and PMs run the whole board; everyone else works their own tasks.
   const canManage = canManageTasks(user.role);
   const [scope, setScope] = useState<"mine" | "all">(canManage ? "all" : "mine");
@@ -42,26 +46,23 @@ export default function TasksPage() {
     const task = tasks.find((t) => t.id === e.dataTransfer.getData("text/plain"));
     if (task && canMove(task)) {
       moveTask(task.id, status);
-      if (status === "complete" && task.status !== "complete") log(user.id, `completed “${task.title}”`);
     }
     setDragOver(null);
   }
 
-  function onCreate(e: FormEvent<HTMLFormElement>) {
+  async function onCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    addTask({
+    const created = await addTask({
       title: String(f.get("title")),
       description: String(f.get("description")) || undefined,
       assignedTo: String(f.get("assignedTo")),
-      createdBy: user.id,
       dueDate: String(f.get("dueDate")),
       priority: f.get("priority") as Priority,
-      status: "pending",
       projectId: String(f.get("projectId")) || undefined,
       tags: String(f.get("tags")).split(",").map((t) => t.trim()).filter(Boolean),
     });
-    setCreating(false);
+    if (created) setCreating(false);
   }
 
   return (
@@ -111,7 +112,6 @@ export default function TasksPage() {
                     canMove={canMove(t)}
                     onMove={(s) => {
                       moveTask(t.id, s);
-                      if (s === "complete" && t.status !== "complete") log(user.id, `completed “${t.title}”`);
                     }}
                     onDelete={() => deleteTask(t.id)}
                   />

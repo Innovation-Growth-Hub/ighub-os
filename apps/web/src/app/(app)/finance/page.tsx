@@ -2,10 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { Banknote, Plus, Receipt, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { useDb, userById } from "@/lib/store";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { canRecordFinance } from "@ighub/shared";
-import { EXPENSE_CATEGORIES, INCOME_SOURCES } from "@/lib/mock/seed";
+import { EXPENSE_CATEGORIES, INCOME_SOURCES } from "@ighub/shared";
 import type { TransactionKind } from "@ighub/shared";
 import { formatDate, formatNaira, formatNairaCompact, toDateKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,11 +16,14 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { ColumnChart } from "@/components/charts/column-chart";
 import { BarList } from "@/components/charts/bar-list";
+import { useActions, useInvoices, useTransactions } from "@/lib/api/hooks";
 
 export default function FinancePage() {
   const user = useCurrentUser();
   const canRecord = canRecordFinance(user.role);
-  const { transactions, invoices, users, addTransaction } = useDb();
+  const transactions = useTransactions();
+  const invoices = useInvoices();
+  const { addTransaction } = useActions();
   const [kind, setKind] = useState<"all" | TransactionKind>("all");
   const [adding, setAdding] = useState<TransactionKind | null>(null);
   const [today] = useState(() => toDateKey(new Date()));
@@ -129,7 +131,7 @@ export default function FinancePage() {
                   <Receipt className="size-4 text-muted" aria-hidden />
                   <div className="min-w-0 flex-1 text-sm">
                     <p className="font-bold">{i.number}</p>
-                    <p className="truncate text-xs text-muted">{userById(users, i.clientId)?.company} · due {formatDate(i.dueAt, { year: undefined })}</p>
+                    <p className="truncate text-xs text-muted">{i.clientName} · due {formatDate(i.dueAt, { year: undefined })}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-extrabold">{formatNairaCompact(i.amount)}</p>

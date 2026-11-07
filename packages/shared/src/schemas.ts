@@ -52,3 +52,10 @@ export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
 /** PATCH /api/v1/accounts/:id/status — super admin only. */
 export const setAccountStatusSchema = z.object({ active: z.boolean() });
 export type SetAccountStatusInput = z.infer<typeof setAccountStatusSchema>;
+
+/** PATCH /api/v1/me — users edit their own name and phone. */
+export const updateMeSchema = z
+  .object({ name: profileFields.name, phone: z.string().trim().max(32) })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update." });
+export type UpdateMeInput = z.infer<typeof updateMeSchema>;

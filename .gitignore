@@ -43,3 +43,7 @@ yarn-error.log*
 next-env.d.ts
 
 prd.md
+uploads/
+.e2e-uploads/
+bundle/
+deploy/

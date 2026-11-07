@@ -4,25 +4,30 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ChevronLeft, KeyRound, Mail, MapPin, Pencil, Phone, UserX } from "lucide-react";
-import { computePenalties, useDb } from "@/lib/store";
-import { authClient, generateTempPassword, useCurrentUser } from "@/lib/auth/auth-client";
+import { useCurrentUser } from "@/lib/auth/auth-client";
 import { canManageAccounts, ROLE_LABELS } from "@ighub/shared";
-import { OFFICES } from "@/lib/mock/seed";
-import { formatDate, formatNaira, formatTime } from "@/lib/utils";
+import { OFFICES } from "@ighub/shared";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Avatar, EmptyState, StatTile } from "@/components/ui/misc";
 import { Badge, PriorityBadge, StatusBadge } from "@/components/ui/badge";
-import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { STAFF_TYPE_LABELS, StaffForm } from "@/components/staff/staff-form";
 import { Credentials } from "@/components/staff/credentials";
+import { useAccounts, useActions, useDailyLogs, useTasks, useUsers } from "@/lib/api/hooks";
 
 export default function StaffProfilePage() {
   const { id } = useParams<{ id: string }>();
   const me = useCurrentUser();
-  const { users, attendance, tasks, lateRequests, updateUser } = useDb();
   const canManage = canManageAccounts(me.role);
+  // Admins get the full account list (phones, first-login flag); others the directory.
+  const accounts = useAccounts();
+  const directory = useUsers();
+  const users = accounts.length ? accounts : directory;
+  const tasks = useTasks();
+  const logs = useDailyLogs();
+  const { updateAccount, setAccountActive, resetPassword } = useActions();
   const [editing, setEditing] = useState(false);
   const [resetTo, setResetTo] = useState<string | null>(null);
   const user = users.find((u) => u.id === id);
@@ -31,11 +36,8 @@ export default function StaffProfilePage() {
     return <EmptyState icon={UserX} title="Staff member not found" action={<Link href="/staff" className="font-bold text-primary-ink">Back to staff</Link>} />;
   }
 
-  const mine = attendance.filter((a) => a.userId === user.id).sort((a, b) => b.date.localeCompare(a.date));
-  const last20 = mine.slice(0, 20);
-  const rate = (s: string) => (last20.length ? Math.round((last20.filter((a) => a.status === s).length / last20.length) * 100) : 0);
-  const penalties = computePenalties(mine, lateRequests);
   const myTasks = tasks.filter((t) => t.assignedTo === user.id);
+  const myLogs = logs.filter((l) => l.userId === user.id);
 
   return (
     <div className="space-y-6">
@@ -65,16 +67,14 @@ export default function StaffProfilePage() {
               variant="secondary"
               onClick={async () => {
                 if (!confirm(`Reset ${user.name}'s password? They'll have to set a new one when they next log in.`)) return;
-                const password = generateTempPassword();
-                const { error } = await authClient.admin.setUserPassword({ userId: user.id, newPassword: password });
-                if (error) return alert(error.message);
-                setResetTo(password);
+                const res = await resetPassword(user.id);
+                if (res) setResetTo(res.temporaryPassword);
               }}
             >
               <KeyRound className="size-4" /> Reset password
             </Button>
             {user.id !== me.id && (
-              <Button variant="secondary" onClick={() => updateUser(user.id, { isActive: !user.isActive })}>
+              <Button variant="secondary" onClick={() => setAccountActive(user.id, !user.isActive)}>
                 {user.isActive ? "Deactivate" : "Reactivate"}
               </Button>
             )}
@@ -83,31 +83,29 @@ export default function StaffProfilePage() {
         )}
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <StatTile label="On time (last 20 days)" value={`${rate("on_time")}%`} />
-        <StatTile label="Late" value={`${rate("late")}%`} />
-        <StatTile label="Absent" value={`${rate("absent")}%`} />
-        <StatTile label="Penalties" value={formatNaira(penalties.reduce((a, p) => a + p.amount, 0))} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatTile label="Open tasks" value={String(myTasks.filter((t) => t.status !== "complete").length)} />
+        <StatTile label="Completed tasks" value={String(myTasks.filter((t) => t.status === "complete").length)} />
+        <StatTile label="Joined" value={formatDate(user.joinedAt, { day: undefined })} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Attendance history" />
-          <Table>
-            <THead>
-              <tr><Th>Date</Th><Th>Clock in</Th><Th>Clock out</Th><Th>Status</Th></tr>
-            </THead>
-            <tbody>
-              {mine.slice(0, 10).map((a) => (
-                <Tr key={a.id}>
-                  <Td className="font-semibold whitespace-nowrap">{formatDate(a.date, { weekday: "short" })}</Td>
-                  <Td>{a.clockIn ? formatTime(a.clockIn) : "—"}</Td>
-                  <Td>{a.clockOut ? formatTime(a.clockOut) : "—"}</Td>
-                  <Td><StatusBadge status={a.status} /></Td>
-                </Tr>
+          <CardHeader title="Recent daily logs" description={me.role === "super_admin" ? "View only" : undefined} />
+          {myLogs.length === 0 ? (
+            <p className="text-sm text-muted">{me.role === "super_admin" ? "No logs yet." : "Only the super admin can read other people's logs."}</p>
+          ) : (
+            <ul className="space-y-2">
+              {myLogs.slice(0, 7).map((l) => (
+                <li key={l.id} className="rounded-2xl bg-canvas p-3 text-sm">
+                  <p className="font-bold">{formatDate(l.date, { weekday: "short" })}</p>
+                  <ul className="mt-1 list-disc pl-5 text-muted">
+                    {l.entries.map((e) => <li key={e.id}>{e.description}{e.hours !== undefined && ` (${e.hours}h)`}</li>)}
+                  </ul>
+                </li>
               ))}
-            </tbody>
-          </Table>
+            </ul>
+          )}
         </Card>
         <Card>
           <CardHeader title="Tasks" />
@@ -131,9 +129,11 @@ export default function StaffProfilePage() {
         <StaffForm
           initial={user}
           submitLabel="Save changes"
-          onSubmit={(v) => {
-            updateUser(user.id, v);
-            setEditing(false);
+          onSubmit={async (v) => {
+            // Email changes aren't supported yet; send everything else.
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { email, ...patch } = v;
+            if (await updateAccount(user.id, patch)) setEditing(false);
           }}
         />
       </Modal>

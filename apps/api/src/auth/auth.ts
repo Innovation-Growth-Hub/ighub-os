@@ -106,6 +106,8 @@ export function createAuth(db: Database, env: Env) {
 
     advanced: {
       database: { generateId: () => randomUUID() },
+      // Behind Next.js rewrites and Hostinger's proxy the client IP arrives in X-Forwarded-For.
+      ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
       useSecureCookies: env.NODE_ENV === "production",
     },
 

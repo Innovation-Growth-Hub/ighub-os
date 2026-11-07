@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, Search, Settings, UserRound } from "lucide-react";
 import { authClient } from "@/lib/auth/auth-client";
-import { ROLE_LABELS } from "@ighub/shared";
-import { useDb } from "@/lib/store";
+import { queueFor, ROLE_LABELS } from "@ighub/shared";
+import { useFundRequests } from "@/lib/api/hooks";
 import type { User } from "@ighub/shared";
 import { greeting } from "@/lib/utils";
 import { Avatar } from "@/components/ui/misc";
@@ -16,7 +16,8 @@ export function Topbar({ user, onMenu }: { user: User; onMenu: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const menuRef = useRef<HTMLDivElement>(null);
-  const pending = useDb((s) => s.lateRequests.filter((r) => r.status === "pending").length);
+  // Fund requests waiting on this user (accountant / super admin).
+  const pending = queueFor(useFundRequests(), user).length;
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
@@ -75,7 +76,7 @@ export function Topbar({ user, onMenu }: { user: User; onMenu: () => void }) {
       </label>
 
       <Link
-        href="/attendance"
+        href="/requests"
         aria-label={`Notifications${pending ? `, ${pending} pending` : ""}`}
         className="relative flex size-11 items-center justify-center rounded-full bg-surface hover:bg-surface-2"
       >

@@ -1,18 +1,18 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
-import { CircleCheck, RotateCcw } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { authClient, useCurrentUser } from "@/lib/auth/auth-client";
-import { isSuperAdmin, ROLE_LABELS } from "@ighub/shared";
-import { MIN_PASSWORD_LENGTH } from "@/lib/mock/seed";
-import { useDb } from "@/lib/store";
+import { ROLE_LABELS } from "@ighub/shared";
+import { MIN_PASSWORD_LENGTH } from "@ighub/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/form";
 import { Avatar, PageHeader, Pills } from "@/components/ui/misc";
 import { Badge } from "@/components/ui/badge";
 import { BrandLoader } from "@/components/ui/brand-loader";
+import { useActions } from "@/lib/api/hooks";
 
 type Tab = "profile" | "account";
 
@@ -44,13 +44,16 @@ function Saved({ show }: { show: boolean }) {
 
 function Profile() {
   const user = useCurrentUser();
-  const updateUser = useDb((s) => s.updateUser);
+  const { updateMyProfile } = useActions();
+  const { refetch } = authClient.useSession();
   const [saved, setSaved] = useState(false);
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    updateUser(user.id, { name: String(f.get("name")), phone: String(f.get("phone")) || undefined });
+    const ok = await updateMyProfile({ name: String(f.get("name")).trim(), phone: String(f.get("phone")).trim() });
+    if (!ok) return;
+    await refetch(); // the session carries the name shown in the top bar
     setSaved(true);
   }
 
@@ -74,9 +77,6 @@ function Profile() {
 }
 
 function Account() {
-  const user = useCurrentUser();
-  const router = useRouter();
-  const resetDemo = useDb((s) => s.resetDemo);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,7 +91,7 @@ function Account() {
       newPassword: String(f.get("new")),
       revokeOtherSessions: true,
     });
-    if (error) return setError(error.message);
+    if (error) return setError(error.status === 400 || error.status === 401 ? "Your current password is incorrect." : error.message ?? "Couldn't update your password.");
     setError(null);
     setSaved(true);
     form.reset();
@@ -109,22 +109,6 @@ function Account() {
           <div className="flex items-center gap-4"><Button type="submit">Update password</Button><Saved show={saved} /></div>
         </form>
       </Card>
-      {isSuperAdmin(user.role) && (
-        <Card>
-          <CardHeader title="Demo data" description="Restore every module to the original mock dataset. Changes made in this browser are lost." />
-          <Button
-            variant="danger"
-            onClick={async () => {
-              if (!confirm("Reset all demo data?")) return;
-              resetDemo();
-              await authClient.signOut();
-              router.replace("/login");
-            }}
-          >
-            <RotateCcw className="size-4" /> Reset demo data
-          </Button>
-        </Card>
-      )}
     </div>
   );
 }

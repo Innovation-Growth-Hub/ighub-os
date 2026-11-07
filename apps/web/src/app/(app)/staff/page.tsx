@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Eye, Search, Trash2, UserPlus, Users } from "lucide-react";
-import { useDb } from "@/lib/store";
-import { authClient, useCurrentUser } from "@/lib/auth/auth-client";
+import { Eye, Search, UserPlus, Users } from "lucide-react";
+import { useCurrentUser } from "@/lib/auth/auth-client";
 import { canManageAccounts, ROLE_LABELS } from "@ighub/shared";
-import { OFFICES } from "@/lib/mock/seed";
+import { OFFICES } from "@ighub/shared";
 import type { StaffType, User } from "@ighub/shared";
-import { workers } from "@/lib/attendance";
+import { workers } from "@ighub/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/form";
@@ -18,12 +17,14 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { STAFF_TYPE_LABELS, StaffForm } from "@/components/staff/staff-form";
 import { Credentials } from "@/components/staff/credentials";
+import { useAccounts, useActions } from "@/lib/api/hooks";
 
 type Filter = "all" | StaffType;
 
 export default function StaffPage() {
   const me = useCurrentUser();
-  const { users, deleteUser } = useDb();
+  const users = useAccounts();
+  const { createAccount } = useActions();
   const canManage = canManageAccounts(me.role);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
@@ -112,16 +113,6 @@ export default function StaffPage() {
                       <Link href={`/staff/${u.id}`} aria-label={`View ${u.name}`} className="flex size-9 items-center justify-center rounded-full hover:bg-surface-2">
                         <Eye className="size-4" />
                       </Link>
-                      {canManage && u.id !== me.id && (
-                        <button
-                          type="button"
-                          aria-label={`Delete ${u.name}`}
-                          onClick={() => confirm(`Delete ${u.name}? This can't be undone.`) && deleteUser(u.id)}
-                          className="flex size-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      )}
                     </div>
                   </Td>
                 </Tr>
@@ -139,11 +130,11 @@ export default function StaffPage() {
           busy={busy}
           onSubmit={async (v, password = "") => {
             setBusy(true);
-            const { data, error } = await authClient.admin.createUser({ password, data: v });
+            const res = await createAccount({ ...v, staffType: v.staffType ?? "core_team", officeLocation: v.officeLocation ?? "umuahia_hq", password });
             setBusy(false);
-            if (error) return setError(error.message);
+            if (!res) return;
             setAdding(false);
-            setCreated({ user: data.user, password });
+            setCreated({ user: res.account, password: res.temporaryPassword });
           }}
         />
       </Modal>

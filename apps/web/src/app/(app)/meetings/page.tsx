@@ -4,8 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Check, Clock, MapPin, Plus, X } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { canScheduleMeetings, isAdmin } from "@ighub/shared";
-import { useDb, userById } from "@/lib/store";
-import { workers } from "@/lib/attendance";
+import { workers } from "@ighub/shared";
 import type { MeetingStatus } from "@ighub/shared";
 import { cn, formatTime, toDateKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,10 +14,14 @@ import { Modal } from "@/components/ui/modal";
 import { Avatar, PageHeader, Pills } from "@/components/ui/misc";
 import { StatusBadge } from "@/components/ui/badge";
 import { MiniCalendar } from "@/components/dashboard/shared";
+import { useActions, useMeetings, useUsers } from "@/lib/api/hooks";
+import { userById } from "@/lib/derived";
 
 export default function MeetingsPage() {
   const user = useCurrentUser();
-  const { meetings, users, addMeeting, setMeetingStatus } = useDb();
+  const meetings = useMeetings();
+  const users = useUsers();
+  const { addMeeting, setMeetingStatus } = useActions();
   const [filter, setFilter] = useState<"all" | MeetingStatus>("scheduled");
   const [creating, setCreating] = useState(false);
   const [participants, setParticipants] = useState<string[]>([user.id]);

@@ -4,8 +4,7 @@ import { useState, type FormEvent } from "react";
 import { CircleCheck, ClipboardList, Eye, Plus, Trash2, UserX } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { canViewAllDailyLogs, isComingSoon, writesDailyLog } from "@ighub/shared";
-import { workers } from "@/lib/attendance";
-import { useDb, userById } from "@/lib/store";
+import { workers } from "@ighub/shared";
 import type { DailyLog, User } from "@ighub/shared";
 import { cn, formatDate, toDateKey, uid } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,9 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Avatar, EmptyState, PageHeader, StatTile } from "@/components/ui/misc";
 import { LogCard, totalHours } from "@/components/daily-logs/log-card";
+import { useActions, useDailyLogs, useLoaded, useTasks, useUsers } from "@/lib/api/hooks";
+import { BrandLoader } from "@/components/ui/brand-loader";
+import { userById } from "@/lib/derived";
 
 export default function DailyLogsPage() {
   const user = useCurrentUser();
@@ -30,9 +32,18 @@ const toRows = (log?: DailyLog): Row[] =>
     ? log.entries.map((e) => ({ id: e.id, description: e.description, hours: e.hours?.toString() ?? "", taskId: e.taskId ?? "" }))
     : [{ id: uid("le"), description: "", hours: "", taskId: "" }];
 
+/** Waits for the user's logs so the form starts from today's saved entries. */
 function MyLogs({ user }: { user: User }) {
-  const { dailyLogs, tasks, saveDailyLog } = useDb();
+  const dailyLogs = useDailyLogs();
+  const loaded = useLoaded("daily-logs");
   const [today] = useState(() => toDateKey(new Date()));
+  if (!loaded) return <BrandLoader className="min-h-64" />;
+  return <MyLogsForm user={user} today={today} dailyLogs={dailyLogs} />;
+}
+
+function MyLogsForm({ user, today, dailyLogs }: { user: User; today: string; dailyLogs: DailyLog[] }) {
+  const tasks = useTasks();
+  const { saveDailyLog } = useActions();
   const existing = dailyLogs.find((l) => l.userId === user.id && l.date === today);
   const [rows, setRows] = useState<Row[]>(() => toRows(existing));
   const [blockers, setBlockers] = useState(existing?.blockers ?? "");
@@ -46,7 +57,7 @@ function MyLogs({ user }: { user: User }) {
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
-  function onSave(e: FormEvent) {
+  async function onSave(e: FormEvent) {
     e.preventDefault();
     const entries = rows
       .filter((r) => r.description.trim())
@@ -57,8 +68,7 @@ function MyLogs({ user }: { user: User }) {
         taskId: r.taskId || undefined,
       }));
     if (!entries.length) return;
-    saveDailyLog(user.id, today, entries, blockers.trim());
-    setSaved(true);
+    if (await saveDailyLog({ entries, blockers: blockers.trim() || undefined })) setSaved(true);
   }
 
   return (
@@ -133,7 +143,9 @@ function MyLogs({ user }: { user: User }) {
 // ---------- Super admin: read-only view of everyone's logs ----------
 
 function TeamLogs() {
-  const { dailyLogs, users, tasks } = useDb();
+  const dailyLogs = useDailyLogs();
+  const users = useUsers();
+  const tasks = useTasks();
   const [today] = useState(() => toDateKey(new Date()));
   const [date, setDate] = useState(today);
   const [person, setPerson] = useState("all");

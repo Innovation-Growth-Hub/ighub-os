@@ -93,7 +93,8 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  clientId?: string;
+  /** Client organisation (free text until client accounts launch). */
+  clientName?: string;
   managerId: string;
   teamIds: string[];
   startDate: string;
@@ -176,7 +177,9 @@ export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
 export interface Invoice {
   id: string;
   number: string;
-  clientId: string;
+  /** CRM contact billed, if any. */
+  contactId?: string;
+  clientName: string;
   amount: number;
   issuedAt: string;
   dueAt: string;

@@ -4,17 +4,18 @@ import Link from "next/link";
 import { useState } from "react";
 import { ClipboardList, CircleCheck } from "lucide-react";
 import { canViewAllDailyLogs, isComingSoon, writesDailyLog } from "@ighub/shared";
-import { workers } from "@/lib/attendance";
-import { useDb } from "@/lib/store";
+import { workers } from "@ighub/shared";
 import type { User } from "@ighub/shared";
 import { toDateKey } from "@/lib/utils";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/misc";
 import { LinkButton } from "@/components/ui/button";
+import { useDailyLogs, useUsers } from "@/lib/api/hooks";
 
 /** Super admin: who has logged today. Everyone else: a nudge to log today's work. */
 export function DailyLogCard({ user }: { user: User }) {
-  const { dailyLogs, users } = useDb();
+  const dailyLogs = useDailyLogs();
+  const users = useUsers();
   const [today] = useState(() => toDateKey(new Date()));
   const todays = dailyLogs.filter((l) => l.date === today);
 

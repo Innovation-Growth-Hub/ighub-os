@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import { useDb, userById } from "@/lib/store";
 import type { Meeting } from "@ighub/shared";
 import { cn, formatTime, toDateKey } from "@/lib/utils";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/misc";
+import { useActivities, useUsers } from "@/lib/api/hooks";
+import { userById } from "@/lib/derived";
 
 /** Month calendar with dots on days that have meetings. */
 export function MiniCalendar({ meetings }: { meetings: Meeting[] }) {
@@ -121,8 +122,8 @@ export function UpcomingSchedule({ meetings, limit = 4 }: { meetings: Meeting[];
 }
 
 export function RecentActivity({ limit = 6 }: { limit?: number }) {
-  const activities = useDb((s) => s.activities);
-  const users = useDb((s) => s.users);
+  const activities = useActivities();
+  const users = useUsers();
   const items = [...activities].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
   return (
     <Card>

@@ -60,6 +60,7 @@ describe.skipIf(!TEST_DB)("accounts (e2e)", () => {
       BETTER_AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-e2e",
       BETTER_AUTH_URL: ORIGIN,
       WEB_ORIGINS: [ORIGIN],
+      UPLOAD_DIR: "./.e2e-uploads",
     };
     app = await createApp(env);
     await app.init();

@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { HandCoins } from "lucide-react";
 import { queueFor } from "@ighub/shared";
-import { useDb, userById } from "@/lib/store";
 import type { User } from "@ighub/shared";
 import { formatDate, formatNaira } from "@/lib/utils";
 import { Card, CardHeader } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
+import { useFundRequests, useUsers } from "@/lib/api/hooks";
+import { userById } from "@/lib/derived";
 
 /**
  * Reviewers (accountant, super admin) see what's waiting on them;
  * everyone else sees the status of their own latest requests.
  */
 export function FundRequestsCard({ user, className }: { user: User; className?: string }) {
-  const { fundRequests, users } = useDb();
+  const fundRequests = useFundRequests();
+  const users = useUsers();
   const reviewer = user.role === "accountant" || user.role === "super_admin";
   const rows = reviewer
     ? queueFor(fundRequests, user)

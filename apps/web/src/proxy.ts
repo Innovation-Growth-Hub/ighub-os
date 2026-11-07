@@ -1,19 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getSessionCookie } from "better-auth/cookies";
 
-// Keep in sync with SESSION_COOKIE in lib/auth/auth-client.ts.
-// With Better Auth, replace this with `getSessionCookie(request)` from "better-auth/cookies".
-const SESSION_COOKIE = "ighub.session_token";
-
-// No public sign-up: the super admin creates every account.
 const PUBLIC_PATHS = ["/login"];
 
 /**
- * Optimistic check only: redirects based on cookie presence.
- * Real authorization happens in the app shell (and later on the API).
+ * Optimistic check only: redirects based on whether a Better Auth session
+ * cookie exists. Real checks happen in the app shell and, authoritatively, the API.
+ * /api/* is rewritten to the API (next.config.ts) and skipped here.
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const hasSession = Boolean(getSessionCookie(request));
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (!hasSession && !isPublic) {
@@ -28,5 +25,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico)$).*)"],
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|ico)$).*)"],
 };

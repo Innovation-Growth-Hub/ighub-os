@@ -9,7 +9,7 @@ export function workers(users: User[]) {
 /** Row-level visibility for projects (mirrors the future API policy). */
 export function visibleProjects(projects: Project[], user: User) {
   if (isAdmin(user.role)) return projects;
-  if (user.role === "client") return projects.filter((p) => p.clientId === user.id);
+  if (user.role === "client") return []; // client accounts are coming soon
   return projects.filter((p) => p.managerId === user.id || p.teamIds.includes(user.id));
 }
 

@@ -5,9 +5,9 @@ import { HandCoins, Hourglass, Paperclip, Plus, Upload, Wallet } from "lucide-re
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { visibleProjects } from "@ighub/shared";
 import { allowedDecisions, canAddReceipt, DECISION_LABELS, queueFor, STATUS_HINT } from "@ighub/shared";
-import { ACCOUNTANT_APPROVAL_LIMIT, EXPENSE_CATEGORIES } from "@/lib/mock/seed";
-import { useDb, userById, type FileMeta, type FundRequestDecision } from "@/lib/store";
-import type { FundRequest, User } from "@ighub/shared";
+import { ACCOUNTANT_APPROVAL_LIMIT, EXPENSE_CATEGORIES } from "@ighub/shared";
+import type { FundRequest, FundRequestDecision, User } from "@ighub/shared";
+import { downloadUrl } from "@/lib/api/client";
 import { cn, formatDate, formatNaira, formatNairaCompact, toDateKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,12 +15,17 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { Avatar, EmptyState, PageHeader, Pills, StatTile } from "@/components/ui/misc";
 import { Badge, StatusBadge } from "@/components/ui/badge";
+import { useActions, useFundRequests, useProjects, useUsers } from "@/lib/api/hooks";
+import { userById } from "@/lib/derived";
 
 type Tab = "queue" | "mine" | "all";
 
 export default function FundRequestsPage() {
   const user = useCurrentUser();
-  const { fundRequests, users, projects, submitFundRequest, decideFundRequest, attachToFundRequest } = useDb();
+  const fundRequests = useFundRequests();
+  const users = useUsers();
+  const projects = useProjects();
+  const { submitFundRequest, decideFundRequest, addReceipts } = useActions();
   const reviewer = user.role === "accountant" || user.role === "super_admin";
   const [tab, setTab] = useState<Tab>(reviewer ? "queue" : "mine");
   const [creating, setCreating] = useState(false);
@@ -34,27 +39,24 @@ export default function FundRequestsPage() {
     .sort((a, b) => (tab === "queue" ? 0 : b.createdAt.localeCompare(a.createdAt)));
   const sum = (rows: FundRequest[]) => rows.reduce((a, r) => a + r.amount, 0);
 
-  function onCreate(e: FormEvent<HTMLFormElement>) {
+  async function onCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    submitFundRequest(user.id, {
-      title: String(f.get("title")),
-      purpose: String(f.get("purpose")),
-      amount: Number(f.get("amount")),
-      category: String(f.get("category")),
-      neededBy: String(f.get("neededBy")),
-      projectId: String(f.get("projectId")) || undefined,
-    }, toFileMeta(f.getAll("quotes")));
-    setCreating(false);
-    setTab("mine");
+    const form = new FormData(e.currentTarget);
+    // Browsers send an empty file part when nothing is chosen; drop it.
+    const quotes = realFiles(form.getAll("quotes"));
+    form.delete("quotes");
+    quotes.forEach((q) => form.append("quotes", q));
+    if (await submitFundRequest(form)) {
+      setCreating(false);
+      setTab("mine");
+    }
   }
 
-  function onDecide(e: FormEvent<HTMLFormElement>) {
+  async function onDecide(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!deciding) return;
     const note = String(new FormData(e.currentTarget).get("note")).trim();
-    decideFundRequest(deciding.req.id, user.id, deciding.decision, note);
-    setDeciding(null);
+    if (await decideFundRequest(deciding.req.id, deciding.decision, note || undefined)) setDeciding(null);
   }
 
   return (
@@ -113,7 +115,7 @@ export default function FundRequestsPage() {
               decisions={allowedDecisions(r, user)}
               onDecide={(decision) => setDeciding({ req: r, decision })}
               canAddReceipt={canAddReceipt(r, user)}
-              onReceipts={(files) => attachToFundRequest(r.id, user.id, "receipt", files)}
+              onReceipts={(files) => addReceipts(r.id, files)}
             />
           ))}
         </ul>
@@ -179,11 +181,8 @@ const ACTION_TEXT: Record<FundRequest["history"][number]["action"], string> = {
   disbursed: "paid it out",
 };
 
-/** Mock upload: keep name and size only. The API will use presigned uploads to object storage. */
-function toFileMeta(entries: FormDataEntryValue[] | FileList | null): FileMeta[] {
-  return Array.from(entries ?? [])
-    .filter((f): f is File => f instanceof File && f.size > 0)
-    .map((f) => ({ name: f.name, sizeKb: Math.max(1, Math.round(f.size / 1024)) }));
+function realFiles(entries: FormDataEntryValue[] | FileList | null): File[] {
+  return Array.from(entries ?? []).filter((f): f is File => f instanceof File && f.size > 0);
 }
 
 function RequestCard({
@@ -205,7 +204,7 @@ function RequestCard({
   decisions: FundRequestDecision[];
   onDecide: (d: FundRequestDecision) => void;
   canAddReceipt: boolean;
-  onReceipts: (files: FileMeta[]) => void;
+  onReceipts: (files: File[]) => void;
 }) {
   const requester = userById(users, req.requesterId);
   return (
@@ -240,10 +239,14 @@ function RequestCard({
         {(req.attachments.length > 0 || canAddReceipt) && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {req.attachments.map((a) => (
-              <span key={a.id} className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-xs font-semibold">
+              <a
+                key={a.id}
+                href={downloadUrl(`/fund-requests/${req.id}/attachments/${a.id}`)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-xs font-semibold hover:bg-mint-soft"
+              >
                 <Paperclip className="size-3.5 text-muted" aria-hidden />
                 <span className="text-muted">{a.kind === "quote" ? "Quote" : "Receipt"}:</span> {a.name}
-              </span>
+              </a>
             ))}
             {canAddReceipt && (
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-mint px-3 py-1.5 text-xs font-bold hover:bg-mint-soft">
@@ -254,7 +257,7 @@ function RequestCard({
                   accept="image/*,.pdf"
                   className="sr-only"
                   onChange={(e) => {
-                    onReceipts(toFileMeta(e.target.files));
+                    onReceipts(realFiles(e.target.files));
                     e.target.value = "";
                   }}
                 />

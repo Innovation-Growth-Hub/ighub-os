@@ -2,9 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
-import { generateTempPassword } from "@/lib/auth/auth-client";
+import { generateTempPassword } from "@ighub/shared";
 import { COMING_SOON_ROLES, LIVE_ROLES, ROLE_LABELS } from "@ighub/shared";
-import { MIN_PASSWORD_LENGTH, OFFICES } from "@/lib/mock/seed";
+import { MIN_PASSWORD_LENGTH, OFFICES } from "@ighub/shared";
 import type { OfficeLocation, Role, StaffType, User } from "@ighub/shared";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";

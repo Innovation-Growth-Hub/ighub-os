@@ -67,7 +67,7 @@ export function Sidebar({ role, open, onClose }: { role: Role; open: boolean; on
             <div key={section.title}>
               <p className="px-3 pb-1.5 text-[11px] font-bold tracking-wider text-muted uppercase">{section.title}</p>
               <ul className="space-y-0.5">
-                {section.items.map(({ href, label, icon: Icon }) => {
+                {section.items.map(({ href, label, icon: Icon, soon }) => {
                   const active = pathname === href || pathname.startsWith(`${href}/`);
                   return (
                     <li key={href}>
@@ -82,6 +82,7 @@ export function Sidebar({ role, open, onClose }: { role: Role; open: boolean; on
                       >
                         <Icon className={cn("size-4.5", active && "text-primary-ink")} strokeWidth={2} aria-hidden />
                         {label}
+                        {soon && <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-muted">Soon</span>}
                       </Link>
                     </li>
                   );

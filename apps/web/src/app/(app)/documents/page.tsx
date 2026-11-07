@@ -1,10 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { BookOpen, FileSignature, FileText, FolderOpen, Lightbulb, Search, Share2, Trash2, Upload } from "lucide-react";
+import { BookOpen, FileSignature, FileText, FolderOpen, Lightbulb, Search, Share2, Trash2, Upload, Download } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/auth-client";
 import { isAdmin } from "@ighub/shared";
-import { useDb, userById } from "@/lib/store";
 import type { DocumentCategory, DocumentFile } from "@ighub/shared";
 import { cn, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,9 @@ import { Input, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { Avatar, EmptyState, PageHeader } from "@/components/ui/misc";
 import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
+import { useActions, useDocuments, useUsers } from "@/lib/api/hooks";
+import { userById } from "@/lib/derived";
+import { downloadUrl } from "@/lib/api/client";
 
 const CATEGORIES: Record<DocumentCategory, { label: string; icon: typeof FileText }> = {
   contracts: { label: "Contracts", icon: FileSignature },
@@ -27,7 +29,9 @@ function size(kb: number) {
 
 export default function DocumentsPage() {
   const user = useCurrentUser();
-  const { documents, users, addDocument, deleteDocument } = useDb();
+  const documents = useDocuments();
+  const users = useUsers();
+  const { uploadDocuments, deleteDocument } = useActions();
   const [category, setCategory] = useState<"all" | DocumentCategory>("all");
   const [uploadCategory, setUploadCategory] = useState<DocumentCategory>("reports");
   const [q, setQ] = useState("");
@@ -41,11 +45,9 @@ export default function DocumentsPage() {
     .filter((d) => d.name.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
-  function onFiles(files: FileList | null) {
-    // Mock upload: records metadata only. Real build: presigned upload to object storage.
-    for (const f of Array.from(files ?? [])) {
-      addDocument({ name: f.name, category: uploadCategory, sizeKb: Math.max(1, Math.round(f.size / 1024)), ownerId: user.id, sharedWith: [] });
-    }
+  async function onFiles(files: FileList | null) {
+    const list = Array.from(files ?? []);
+    if (list.length) await uploadDocuments(uploadCategory, list);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -116,7 +118,7 @@ export default function DocumentsPage() {
                     <Td>
                       <div className="flex items-center gap-3">
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-canvas group-hover:bg-surface"><Icon className="size-4 text-primary-ink" aria-hidden /></span>
-                        <span><span className="block font-bold">{d.name}</span><span className="block text-xs text-muted">{CATEGORIES[d.category].label} · {size(d.sizeKb)}</span></span>
+                        <span><a href={downloadUrl(`/documents/${d.id}/download`)} className="block font-bold hover:underline">{d.name}</a><span className="block text-xs text-muted">{CATEGORIES[d.category].label} · {size(d.sizeKb)}</span></span>
                       </div>
                     </Td>
                     <Td className="whitespace-nowrap text-muted">{owner?.name}</Td>
@@ -129,12 +131,15 @@ export default function DocumentsPage() {
                       </div>
                     </Td>
                     <Td>
+                      <div className="flex justify-end gap-1">
+                        <a href={downloadUrl(`/documents/${d.id}/download`)} aria-label={`Download ${d.name}`} className="flex size-9 items-center justify-center rounded-full hover:bg-surface-2"><Download className="size-4" /></a>
                       {canEdit && (
-                        <div className="flex justify-end gap-1">
+                        <>
                           <button type="button" aria-label={`Share ${d.name}`} onClick={() => setSharing(d)} className="flex size-9 items-center justify-center rounded-full hover:bg-surface-2"><Share2 className="size-4" /></button>
                           <button type="button" aria-label={`Delete ${d.name}`} onClick={() => confirm(`Delete ${d.name}?`) && deleteDocument(d.id)} className="flex size-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50"><Trash2 className="size-4" /></button>
-                        </div>
+                        </>
                       )}
+                        </div>
                     </Td>
                   </Tr>
                 );
@@ -152,8 +157,8 @@ export default function DocumentsPage() {
 }
 
 function ShareForm({ doc, onDone }: { doc: DocumentFile; onDone: () => void }) {
-  const users = useDb((s) => s.users);
-  const shareDocument = useDb((s) => s.shareDocument);
+  const users = useUsers();
+  const shareDocument = useActions().shareDocument;
   const [selected, setSelected] = useState<string[]>(doc.sharedWith);
   const candidates = users.filter((u) => u.id !== doc.ownerId && u.isActive);
 

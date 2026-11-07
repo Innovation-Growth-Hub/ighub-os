@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, type DragEvent } from "react";
-import { useDb } from "@/lib/store";
 import type { DealStage } from "@ighub/shared";
 import { cn, formatNairaCompact } from "@/lib/utils";
 import { PageHeader, StatTile } from "@/components/ui/misc";
 import { CrmTabs } from "@/components/crm/crm-tabs";
+import { useActions, useContacts, useDeals } from "@/lib/api/hooks";
 
 const STAGES: Array<{ id: DealStage; label: string }> = [
   { id: "lead", label: "Lead" },
@@ -17,7 +17,9 @@ const STAGES: Array<{ id: DealStage; label: string }> = [
 ];
 
 export default function PipelinePage() {
-  const { deals, contacts, moveDeal } = useDb();
+  const deals = useDeals();
+  const contacts = useContacts();
+  const { moveDeal } = useActions();
   const [over, setOver] = useState<DealStage | null>(null);
   const open = deals.filter((d) => !["won", "lost"].includes(d.stage));
   const weighted = open.reduce((a, d) => a + (d.value * d.probability) / 100, 0);
