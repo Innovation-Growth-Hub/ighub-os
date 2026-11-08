@@ -1,6 +1,6 @@
 /**
  * First super admin on a fresh server:
- *   ADMIN_EMAIL=you@ighub.com.ng ADMIN_NAME="Your Name" node create-admin.mjs
+ *   ADMIN_EMAIL=you@ighub.ng ADMIN_NAME="Your Name" node create-admin.mjs
  * Prints a temporary password once. Refuses if a super admin exists.
  */
 import { existsSync } from "node:fs";

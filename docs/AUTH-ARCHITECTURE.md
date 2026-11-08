@@ -18,7 +18,7 @@
 
 ```
  Browser
-   │  (only ever talks to os.ighub.com.ng: same origin, first-party cookies)
+   │  (only ever talks to os.ighub.ng: same origin, first-party cookies)
    ▼
  ┌──────────────────────────── Next.js 16 (apps/web) ─────────────────────────────┐
  │ proxy.ts         optimistic: no session cookie → redirect /login                │
@@ -175,7 +175,7 @@ Rule of thumb: **anything below the API line is a convenience; only the API prot
 ## 8. Security baseline
 
 - **Cookies:** `httpOnly`, `Secure`, `SameSite=Lax`, prefixed `__Secure-` in production. A 7-day session refreshes daily, and "Remember me" off means a browser-session cookie.
-- **CSRF:** Better Auth checks `Origin` against `trustedOrigins` (`https://os.ighub.com.ng`). The same-origin rewrite keeps this trivial.
+- **CSRF:** Better Auth checks `Origin` against `trustedOrigins` (`https://os.ighub.ng`). The same-origin rewrite keeps this trivial.
 - **Rate limits:** sign-in, sign-up and reset are limited by Better Auth's built-in limiter (backed by MySQL, or Redis if we add it, in production, not memory). Example: 5 sign-in attempts per minute per IP+email.
 - **Passwords:** minimum 8 characters (generated temporary passwords are 15), checked against the leaked-password list (`haveIBeenPwned` plugin). Hashing is scrypt by default.
 - **2FA:** required for `super_admin` and `admin`, optional for everyone else.
@@ -212,7 +212,7 @@ Rule of thumb: **anything below the API line is a convenience; only the API prot
 | 1 | Who can self-register? | **Decided:** nobody. The super admin creates every account and shares login details by hand. |
 | 1a | API framework? | **Decided:** NestJS + Drizzle (BACKEND-ARCHITECTURE.md) |
 | 2 | Monorepo or two repos? | Monorepo (shared permissions + types) |
-| 3 | Does IGHub use Google Workspace? | If yes, add "Continue with Google" for staff, restricted to `@ighub.com.ng` |
+| 3 | Does IGHub use Google Workspace? | If yes, add "Continue with Google" for staff, restricted to `@ighub.ng` |
 | 4 | Mandatory 2FA for admins? | Yes |
-| 5 | Hosting? | **Decided:** Hostinger Cloud: web on `os.ighub.com.ng`, API on `api.ighub.com.ng` (BACKEND-ARCHITECTURE.md §8) |
+| 5 | Hosting? | **Decided:** Hostinger Cloud: web on `os.ighub.ng`, API on `api.ighub.ng` (BACKEND-ARCHITECTURE.md §8) |
 | 6 | Session length? | 7 days, sliding; 12 hours for admins |

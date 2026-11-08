@@ -46,8 +46,8 @@ Next.js stays a pure frontend. A bug there can't leak data, because it has no da
 ## 2. Request lifecycle
 
 ```
-Browser ──► os.ighub.com.ng (Next.js)
-              │  /api/*  is rewritten by Next.js to api.ighub.com.ng
+Browser ──► os.ighub.ng (Next.js)
+              │  /api/*  is rewritten by Next.js to api.ighub.ng
               ▼
             NestJS app (Express adapter)
               ├─ helmet · Nest logger (JSON in production) · CORS off (same origin)
@@ -166,22 +166,22 @@ New tables beyond the PRD §8 list: `daily_logs` + `daily_log_entries`, `fund_re
 **Plan:** Hostinger Cloud hosting (4 vCPU, 4 GB RAM, 200 GB disk, Node.js 18–24, npm/pnpm). It is managed hosting: no root, no Docker, no Nginx config. So each app runs as a **Hostinger Node.js web app on its own subdomain**, and MySQL comes from hPanel → Databases. NestJS runs as a plain Node process (`node dist/main.js`), so it needs nothing special.
 
 ```
-os.ighub.com.ng      Hostinger Node app: apps/web   (next start)
-                       └─ next.config rewrites /api/*  →  https://api.ighub.com.ng/api/*
-api.ighub.com.ng     Hostinger Node app: apps/api   (node dist/main.js)
+os.ighub.ng      Hostinger Node app: apps/web   (next start)
+                       └─ next.config rewrites /api/*  →  https://api.ighub.ng/api/*
+api.ighub.ng     Hostinger Node app: apps/api   (node dist/main.js)
                        └─ MySQL (hPanel database, localhost)  ·  uploads dir outside public_html
 hPanel cron          node dist/jobs/<job>.js   (weekly penalties, reminders, cleanup)
-ighub.com.ng         unchanged (existing public website)
+ighub.ng         unchanged (existing public website)
 ```
 
 | Concern | How on Hostinger Cloud |
 |---|---|
-| Cookies | The browser only talks to `os.ighub.com.ng`; `/api/*` is rewritten server-side to the API, so auth cookies stay first-party. No CORS, no cross-subdomain cookie setup |
+| Cookies | The browser only talks to `os.ighub.ng`; `/api/*` is rewritten server-side to the API, so auth cookies stay first-party. No CORS, no cross-subdomain cookie setup |
 | TLS | Enable free SSL on both subdomains in hPanel and force HTTPS (Better Auth sets `Secure` cookies) |
 | Database | hPanel MySQL database + user, connected over localhost. Staging gets its own database |
 | Jobs | hPanel cron runs job scripts as commands, not HTTP endpoints, so nothing is exposed. Managed Node apps may be restarted or idled, so in-process scheduling is not relied on. Jobs still take a MySQL `GET_LOCK` |
 | Builds | **Build in GitHub Actions, not on the server** (a Next.js build can use most of 4 GB RAM). CI uploads the built app over SSH and restarts it |
-| Email | Hostinger mailbox SMTP (`smtp.hostinger.com`), e.g. `no-reply@ighub.com.ng` |
+| Email | Hostinger mailbox SMTP (`smtp.hostinger.com`), e.g. `no-reply@ighub.ng` |
 | Files | Local disk under the API app, outside any public folder; served only through authorized API routes |
 | Backups | Hostinger automatic backups **plus** a nightly `mysqldump` cron copied offsite (e.g. R2 or Google Drive) |
 | Environments | `os.` / `api.` for production; `staging-os.` / `staging-api.` with a separate database |

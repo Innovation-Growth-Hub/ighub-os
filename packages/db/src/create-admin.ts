@@ -1,5 +1,5 @@
 /**
- * Local helper: ADMIN_EMAIL=you@ighub.com.ng ADMIN_NAME="Your Name" pnpm db:create-admin
+ * Local helper: ADMIN_EMAIL=you@ighub.ng ADMIN_NAME="Your Name" pnpm db:create-admin
  * (On the server use `node create-admin.mjs` from the API deploy bundle.)
  */
 import { existsSync } from "node:fs";

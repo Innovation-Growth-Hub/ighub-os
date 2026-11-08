@@ -38,6 +38,19 @@ await build({
 await cp("../../packages/db/migrations", `${out}/migrations`, { recursive: true });
 await writeFile(
   `${out}/package.json`,
-  JSON.stringify({ name: "ighubos-api", private: true, type: "module", engines: { node: ">=22.12" }, scripts: { start: "node main.mjs", migrate: "node migrate.mjs" } }, null, 2) + "\n",
+  JSON.stringify(
+    {
+      name: "ighubos-api",
+      private: true,
+      type: "module",
+      main: "main.mjs",
+      // Everything is bundled; express is listed only so Hostinger detects a Node server app.
+      scripts: { build: "echo Prebuilt bundle", start: "node main.mjs", migrate: "node migrate.mjs" },
+      dependencies: { express: "^5.3.0" },
+      engines: { node: ">=22.12" },
+    },
+    null,
+    2,
+  ) + "\n",
 );
 console.log(`API bundled into apps/api/${out}/`);
